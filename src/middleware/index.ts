@@ -21,7 +21,7 @@ const expressSession = session({
   cookie: {
     maxAge: parseInt(env.SESSION_EXPIRY),
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "none", // none only for development purpose
     secure: env.NODE_ENV !== "development",
   },
   rolling: true,
