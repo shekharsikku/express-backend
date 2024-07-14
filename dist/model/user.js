@@ -11,6 +11,7 @@ const mongoose_1 = require("mongoose");
  * @property {string} username - The user's username.
  * @property {string} email - The user's email.
  * @property {string} password - The user's password.
+ * @property {string} refreshtoken - The user's refreshtoken.
  */
 const UserSchema = new mongoose_1.Schema({
     fullname: {
@@ -31,6 +32,10 @@ const UserSchema = new mongoose_1.Schema({
     password: {
         type: String,
         required: true,
+        select: false,
+    },
+    refreshtoken: {
+        type: String,
         select: false,
     },
 }, {

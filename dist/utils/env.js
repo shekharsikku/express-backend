@@ -8,10 +8,12 @@ const envalid_1 = require("envalid");
 dotenv_1.default.config();
 const env = (0, envalid_1.cleanEnv)(process.env, {
     DATABASE_URL: (0, envalid_1.str)(),
-    TOKEN_SECRET: (0, envalid_1.str)(),
-    TOKEN_EXPIRY: (0, envalid_1.str)(),
-    SESSION_EXPIRY: (0, envalid_1.str)(),
-    SESSION_SECRET: (0, envalid_1.str)(),
+    ACCESS_TOKEN_SECRET: (0, envalid_1.str)(),
+    ACCESS_TOKEN_EXPIRY: (0, envalid_1.str)(),
+    ACCESS_COOKIE_EXPIRY: (0, envalid_1.str)(),
+    REFRESH_TOKEN_SECRET: (0, envalid_1.str)(),
+    REFRESH_TOKEN_EXPIRY: (0, envalid_1.str)(),
+    REFRESH_COOKIE_EXPIRY: (0, envalid_1.str)(),
     COOKIES_SECRET: (0, envalid_1.str)(),
     CORS_ORIGIN: (0, envalid_1.str)(),
     PORT: (0, envalid_1.port)(),

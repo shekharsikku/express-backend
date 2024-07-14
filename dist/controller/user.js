@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sessionUser = exports.logoutUser = exports.loginUser = exports.registerUser = void 0;
+exports.tokenRefresh = exports.sessionUser = exports.logoutUser = exports.loginUser = exports.registerUser = void 0;
 const utils_1 = require("../utils");
 const helper_1 = require("../helper");
 const user_1 = __importDefault(require("../model/user"));
@@ -58,27 +58,16 @@ const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (!user) {
             throw new utils_1.ApiError(404, "User not registered!");
         }
-        if (user && req.session.user) {
-            if (String(user._id) === String(req.session.user)) {
-                (0, helper_1.generateToken)(req, res, user._id);
-                const data = {
-                    sid: req.session.id,
-                    uid: req.session.user,
-                    jwt: req.session.token,
-                };
-                return (0, utils_1.ApiResponse)(req, res, 302, "Welcome, already logged in!", data);
-            }
-        }
         const checked = yield (0, helper_1.compareHash)(password, user.password);
         if (checked) {
-            req.session.user = user._id;
-            (0, helper_1.generateToken)(req, res, user._id);
-            const data = {
-                sid: req.session.id,
-                uid: req.session.user,
-                jwt: req.session.token,
-            };
-            return (0, utils_1.ApiResponse)(req, res, 200, "Logged in successfully!", data);
+            const uid = String(user._id);
+            const { access, refresh } = (0, helper_1.generateToken)(req, res, uid);
+            user.refreshtoken = refresh;
+            yield user.save({ validateBeforeSave: false });
+            return (0, utils_1.ApiResponse)(req, res, 200, "Logged in successfully!", {
+                id: user._id,
+                token: { access, refresh },
+            });
         }
         throw new utils_1.ApiError(403, "Invalid user credential!");
     }
@@ -87,31 +76,40 @@ const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.loginUser = loginUser;
-const logoutUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    req.session.destroy(function (error) {
-        if (error) {
-            next(error);
-        }
-        else {
-            res.clearCookie("jwt");
-            res.clearCookie("session");
-            return (0, utils_1.ApiResponse)(req, res, 200, "Logged out successfully!");
-        }
+const logoutUser = (req, res, _next) => __awaiter(void 0, void 0, void 0, function* () {
+    yield user_1.default.findByIdAndUpdate(req.user._id, {
+        $unset: {
+            refreshtoken: 1, // this removes the field from document
+        },
+    }, {
+        new: true,
     });
+    res.clearCookie("access");
+    res.clearCookie("refresh");
+    return (0, utils_1.ApiResponse)(req, res, 200, "Logged out successfully!");
 });
 exports.logoutUser = logoutUser;
-const sessionUser = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const sessionUser = (req, res, _next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const data = {
-            sid: req.session.id,
-            uid: req.session.user,
-            jwt: req.session.token,
-            user: req.user,
-        };
+        const data = req.user;
         return (0, utils_1.ApiResponse)(req, res, 200, "Current session user data!", data);
     }
     catch (error) {
-        next(error);
+        return (0, utils_1.ApiResponse)(req, res, error.code, error.message);
     }
 });
 exports.sessionUser = sessionUser;
+const tokenRefresh = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        const token = req.token;
+        return (0, utils_1.ApiResponse)(req, res, 200, "Token refreshed successfully!", {
+            id: user === null || user === void 0 ? void 0 : user._id,
+            token,
+        });
+    }
+    catch (error) {
+        return (0, utils_1.ApiResponse)(req, res, error.code, error.message);
+    }
+});
+exports.tokenRefresh = tokenRefresh;

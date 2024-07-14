@@ -63,17 +63,27 @@ exports.validateSchema = validateSchema;
  * @param {string} uid _id.
  * @returns {object} Return pair of access and refresh token.
  */
-const generateToken = (req, res, uid) => {
-    const token = jsonwebtoken_1.default.sign({ uid }, env_1.default.TOKEN_SECRET, {
+const generateToken = (_req, res, uid) => {
+    const access = jsonwebtoken_1.default.sign({ uid }, env_1.default.ACCESS_TOKEN_SECRET, {
         algorithm: "HS256",
-        expiresIn: parseInt(env_1.default.TOKEN_EXPIRY),
+        expiresIn: parseInt(env_1.default.ACCESS_TOKEN_EXPIRY),
     });
-    res.cookie("jwt", token, {
-        maxAge: parseInt(env_1.default.TOKEN_EXPIRY) * 1000,
+    const refresh = jsonwebtoken_1.default.sign({ uid }, env_1.default.REFRESH_TOKEN_SECRET, {
+        algorithm: "HS256",
+        expiresIn: parseInt(env_1.default.REFRESH_TOKEN_EXPIRY),
+    });
+    res.cookie("access", access, {
+        maxAge: parseInt(env_1.default.ACCESS_COOKIE_EXPIRY),
         httpOnly: true,
         sameSite: "strict",
         secure: env_1.default.NODE_ENV !== "development",
     });
-    req.session.token = token;
+    res.cookie("refresh", refresh, {
+        maxAge: parseInt(env_1.default.REFRESH_COOKIE_EXPIRY),
+        httpOnly: true,
+        sameSite: "strict",
+        secure: env_1.default.NODE_ENV !== "development",
+    });
+    return { access, refresh };
 };
 exports.generateToken = generateToken;

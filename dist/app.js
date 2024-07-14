@@ -7,8 +7,8 @@ const express_1 = __importDefault(require("express"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const morgan_1 = __importDefault(require("morgan"));
+const cors_1 = __importDefault(require("cors"));
 const env_1 = __importDefault(require("./utils/env"));
-const middleware_1 = require("./middleware");
 const app = (0, express_1.default)();
 app.use(express_1.default.json({
     limit: "100kb",
@@ -21,8 +21,10 @@ app.use(express_1.default.urlencoded({
 app.use(body_parser_1.default.urlencoded({
     extended: true,
 }));
-app.use(middleware_1.corsOrigin);
-app.use(middleware_1.expressSession);
+app.use((0, cors_1.default)({
+    origin: env_1.default.CORS_ORIGIN,
+    credentials: true,
+}));
 app.use((0, cookie_parser_1.default)(env_1.default.COOKIES_SECRET));
 env_1.default.NODE_ENV === "development" ? app.use((0, morgan_1.default)("dev")) : null;
 app.use((err, _req, res, next) => {
