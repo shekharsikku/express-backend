@@ -1,5 +1,6 @@
 declare namespace Express {
   export interface Request {
-    user?: object;
+    user?: any;
+    token?: object;
   }
 }

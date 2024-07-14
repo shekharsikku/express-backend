@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { genSalt, hash, compare } from "bcryptjs";
 import { ZodSchema } from "zod";
-import { Types } from "mongoose";
 import jwt from "jsonwebtoken";
 import { ApiResponse, ValidationError } from "../utils";
 import env from "../utils/env";
@@ -56,23 +55,35 @@ const validateSchema =
  * @returns {object} Return pair of access and refresh token.
  */
 const generateToken = (
-  req: Request,
+  _req: Request,
   res: Response,
-  uid: Types.ObjectId
-): void => {
-  const token = jwt.sign({ uid }, env.TOKEN_SECRET, {
+  uid: string
+): { access: string; refresh: string } => {
+  const access = jwt.sign({ uid }, env.ACCESS_TOKEN_SECRET, {
     algorithm: "HS256",
-    expiresIn: parseInt(env.TOKEN_EXPIRY),
+    expiresIn: parseInt(env.ACCESS_TOKEN_EXPIRY),
   });
 
-  res.cookie("jwt", token, {
-    maxAge: parseInt(env.TOKEN_EXPIRY) * 1000,
+  const refresh = jwt.sign({ uid }, env.REFRESH_TOKEN_SECRET, {
+    algorithm: "HS256",
+    expiresIn: parseInt(env.REFRESH_TOKEN_EXPIRY),
+  });
+
+  res.cookie("access", access, {
+    maxAge: parseInt(env.ACCESS_COOKIE_EXPIRY),
     httpOnly: true,
     sameSite: "strict",
     secure: env.NODE_ENV !== "development",
   });
 
-  req.session.token = token;
+  res.cookie("refresh", refresh, {
+    maxAge: parseInt(env.REFRESH_COOKIE_EXPIRY),
+    httpOnly: true,
+    sameSite: "strict",
+    secure: env.NODE_ENV !== "development",
+  });
+
+  return { access, refresh };
 };
 
 export { generateHash, compareHash, validateSchema, generateToken };

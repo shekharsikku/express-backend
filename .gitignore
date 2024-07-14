@@ -1,10 +1,13 @@
+# editor dirs
+.idea
+.vscode
+.vercel
+
 # node_modules
 node_modules
 
-# environment variables
+# env variables
 .env
 
-# prisma migrations
-migrations
-
+# typescript build info
 *.tsbuildinfo

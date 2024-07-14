@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { validateSchema } from "../helper";
 import { loginSchema, registerSchema } from "../utils/schema";
-import { sessionMiddleware, tokenMiddleware } from "../middleware/auth";
+import { accessToken, refreshToken } from "../middleware";
 import {
   loginUser,
   logoutUser,
   registerUser,
   sessionUser,
+  tokenRefresh,
 } from "../controller/user";
 
 const router = Router();
@@ -14,13 +15,10 @@ const router = Router();
 router.post("/register", validateSchema(registerSchema), registerUser);
 router.post("/login", validateSchema(loginSchema), loginUser);
 
-router.delete("/logout", sessionMiddleware, logoutUser);
+router.delete("/logout", accessToken, logoutUser);
 
-router.get(
-  ["/session", "/current"],
-  sessionMiddleware,
-  tokenMiddleware,
-  sessionUser
-);
+router.patch("/refresh", refreshToken, tokenRefresh);
+
+router.get(["/session", "/current"], accessToken, sessionUser);
 
 export default router;

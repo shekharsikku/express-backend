@@ -53,31 +53,19 @@ const loginUser = async (req: Request, res: Response) => {
       throw new ApiError(404, "User not registered!");
     }
 
-    if (user && req.session.user) {
-      if (String(user._id) === String(req.session.user)) {
-        generateToken(req, res, user._id as Types.ObjectId);
-
-        const data = {
-          sid: req.session.id,
-          uid: req.session.user,
-          jwt: req.session.token,
-        };
-        return ApiResponse(req, res, 302, "Welcome, already logged in!", data);
-      }
-    }
-
     const checked = await compareHash(password, user.password);
 
     if (checked) {
-      req.session.user = user._id as Types.ObjectId;
-      generateToken(req, res, user._id as Types.ObjectId);
+      const uid = String(user._id);
+      const { access, refresh } = generateToken(req, res, uid);
 
-      const data = {
-        sid: req.session.id,
-        uid: req.session.user,
-        jwt: req.session.token,
-      };
-      return ApiResponse(req, res, 200, "Logged in successfully!", data);
+      user.refreshtoken = refresh;
+      await user.save({ validateBeforeSave: false });
+
+      return ApiResponse(req, res, 200, "Logged in successfully!", {
+        id: user._id,
+        token: { access, refresh },
+      });
     }
     throw new ApiError(403, "Invalid user credential!");
   } catch (error: any) {
@@ -85,30 +73,48 @@ const loginUser = async (req: Request, res: Response) => {
   }
 };
 
-const logoutUser = async (req: Request, res: Response, next: NextFunction) => {
-  req.session.destroy(function (error) {
-    if (error) {
-      next(error);
-    } else {
-      res.clearCookie("jwt");
-      res.clearCookie("session");
-      return ApiResponse(req, res, 200, "Logged out successfully!");
+const logoutUser = async (req: Request, res: Response, _next: NextFunction) => {
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $unset: {
+        refreshtoken: 1, // this removes the field from document
+      },
+    },
+    {
+      new: true,
     }
-  });
+  );
+
+  res.clearCookie("access");
+  res.clearCookie("refresh");
+  return ApiResponse(req, res, 200, "Logged out successfully!");
 };
 
-const sessionUser = async (req: Request, res: Response, next: NextFunction) => {
+const sessionUser = async (
+  req: Request,
+  res: Response,
+  _next: NextFunction
+) => {
   try {
-    const data = {
-      sid: req.session.id,
-      uid: req.session.user,
-      jwt: req.session.token,
-      user: req.user,
-    };
+    const data = req.user;
     return ApiResponse(req, res, 200, "Current session user data!", data);
   } catch (error: any) {
-    next(error);
+    return ApiResponse(req, res, error.code, error.message);
   }
 };
 
-export { registerUser, loginUser, logoutUser, sessionUser };
+const tokenRefresh = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    const token = req.token;
+    return ApiResponse(req, res, 200, "Token refreshed successfully!", {
+      id: user?._id,
+      token,
+    });
+  } catch (error: any) {
+    return ApiResponse(req, res, error.code, error.message);
+  }
+};
+
+export { registerUser, loginUser, logoutUser, sessionUser, tokenRefresh };

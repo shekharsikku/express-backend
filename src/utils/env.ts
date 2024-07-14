@@ -6,11 +6,13 @@ dotenv.config();
 const env = cleanEnv(process.env, {
   DATABASE_URL: str(),
 
-  TOKEN_SECRET: str(),
-  TOKEN_EXPIRY: str(),
-
-  SESSION_EXPIRY: str(),
-  SESSION_SECRET: str(),
+  ACCESS_TOKEN_SECRET: str(),
+  ACCESS_TOKEN_EXPIRY: str(),
+  ACCESS_COOKIE_EXPIRY: str(),
+  
+  REFRESH_TOKEN_SECRET: str(),
+  REFRESH_TOKEN_EXPIRY: str(),
+  REFRESH_COOKIE_EXPIRY: str(),
 
   COOKIES_SECRET: str(),
 

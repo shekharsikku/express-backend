@@ -2,8 +2,8 @@ import express, { NextFunction, Request, Response } from "express";
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
 import morgan from "morgan";
+import cors from "cors";
 import env from "./utils/env";
-import { corsOrigin, expressSession } from "./middleware";
 
 const app = express();
 
@@ -27,8 +27,13 @@ app.use(
   })
 );
 
-app.use(corsOrigin);
-app.use(expressSession);
+app.use(
+  cors({
+    origin: env.CORS_ORIGIN,
+    credentials: true,
+  })
+);
+
 app.use(cookieParser(env.COOKIES_SECRET));
 env.NODE_ENV === "development" ? app.use(morgan("dev")) : null;
 
