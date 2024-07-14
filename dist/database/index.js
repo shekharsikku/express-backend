@@ -8,29 +8,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const database_1 = __importDefault(require("./database"));
-const env_1 = __importDefault(require("./utils/env"));
-const app_1 = __importDefault(require("./app"));
-const uri = env_1.default.DATABASE_URL;
-const port = env_1.default.PORT;
-(() => __awaiter(void 0, void 0, void 0, function* () {
+const mongoose_1 = require("mongoose");
+const mongodb = (uri) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const state = yield (0, database_1.default)(uri);
-        if (state == 1) {
-            app_1.default.listen(port, () => {
-                console.log(`Running at: http://localhost:${port}\n`);
-            });
-        }
-        else {
-            throw new Error("Invalid connection state!");
-        }
+        const { connection } = yield (0, mongoose_1.connect)(uri);
+        console.log("Database connected successfully!");
+        return connection.readyState;
     }
     catch (error) {
-        console.log(`Error: ${error.message}\n`);
+        console.log(`Error: ${error.message}`);
         process.exit(1);
     }
-}))();
+});
+exports.default = mongodb;
