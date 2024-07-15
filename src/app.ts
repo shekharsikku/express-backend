@@ -47,7 +47,7 @@ app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
 });
 
 app.get("/", (_req: Request, res: Response) => {
-  return res.status(200).send({ message: "Hello, from Vercel!" });
+  return res.status(200).send({ message: "Hello, from express on vercel!" });
 });
 
 import UserRouter from "./router/user";

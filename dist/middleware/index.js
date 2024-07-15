@@ -30,19 +30,19 @@ const accessToken = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
     try {
         const token = req.cookies.access;
         if (!token) {
-            throw new utils_1.ApiError(401, "Cannot access!");
+            throw new utils_1.ApiError(401, "Unauthorized access request!");
         }
         const decoded = jsonwebtoken_1.default.verify(token, env_1.default.ACCESS_TOKEN_SECRET);
         const user = yield user_1.default.findById(decoded.uid);
         if (!decoded || !user) {
-            throw new utils_1.ApiError(403, "Invalid request!");
+            throw new utils_1.ApiError(403, "Invalid access request!");
         }
         req.user = user;
         next();
     }
     catch (error) {
         if (error.name === "TokenExpiredError") {
-            return (0, utils_1.ApiResponse)(req, res, 401, "Access expired!");
+            return (0, utils_1.ApiResponse)(req, res, 401, "Access request expired!");
         }
         return (0, utils_1.ApiResponse)(req, res, error.code, error.message);
     }
@@ -60,15 +60,14 @@ const refreshToken = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     try {
         const token = req.cookies.refresh;
         if (!token) {
-            throw new utils_1.ApiError(401, "Unauthorized user!");
+            throw new utils_1.ApiError(401, "Unauthorized user request!");
         }
         const decoded = jsonwebtoken_1.default.verify(token, env_1.default.REFRESH_TOKEN_SECRET);
         const user = yield user_1.default.findById(decoded === null || decoded === void 0 ? void 0 : decoded.uid).select("+refreshtoken");
         if (!decoded || !user || token !== (user === null || user === void 0 ? void 0 : user.refreshtoken)) {
-            throw new utils_1.ApiError(401, "Invalid request!");
+            throw new utils_1.ApiError(401, "Invalid user request!");
         }
-        const uid = String(user._id);
-        const { access, refresh } = (0, helper_1.generateToken)(req, res, uid);
+        const { access, refresh } = (0, helper_1.generateToken)(req, res, user._id);
         user.refreshtoken = refresh;
         yield user.save({ validateBeforeSave: false });
         const tokens = { access, refresh };

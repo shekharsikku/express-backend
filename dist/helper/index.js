@@ -51,7 +51,7 @@ const validateSchema = (schema) => (req, res, next) => {
     }
     catch (error) {
         const errors = (0, utils_1.ValidationError)(error);
-        return (0, utils_1.ApiResponse)(req, res, 400, error.name, { errors });
+        return (0, utils_1.ApiResponse)(req, res, 400, error.name, null, errors);
     }
 };
 exports.validateSchema = validateSchema;
@@ -60,7 +60,7 @@ exports.validateSchema = validateSchema;
  *
  * @param {Request} _req Request.
  * @param {Response} res Response.
- * @param {string} uid _id.
+ * @param {Types.ObjectId} uid _id.
  * @returns {object} Return pair of access and refresh token.
  */
 const generateToken = (_req, res, uid) => {

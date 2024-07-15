@@ -30,11 +30,13 @@ exports.ApiError = ApiError;
  * @param {any} data Response data.
  * @returns {JSON} Return api response in json format.
  */
-const ApiResponse = (_req, res, code, message, data = null) => {
+const ApiResponse = (_req, res, code, message, data = null, errors = null) => {
     const success = code < 400 ? true : false;
     const response = { code, success, message };
     if (data)
         response.data = data;
+    if (errors)
+        response.errors = errors;
     return res.status(code).send(Object.assign({}, response));
 };
 exports.ApiResponse = ApiResponse;

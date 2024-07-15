@@ -6,7 +6,7 @@ const mongodb = async (uri: string) => {
     console.log("Database connected successfully!");
     return connection.readyState;
   } catch (error: any) {
-    console.log(`Error: ${error.message}`);
+    console.error(`Error: ${error.message}`);
     process.exit(1);
   }
 };

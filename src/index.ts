@@ -10,13 +10,13 @@ const port = env.PORT;
     const state = await mongodb(uri);
     if (state == 1) {
       app.listen(port, () => {
-        console.log(`Running at: http://localhost:${port}\n`);
+        console.log(`🚀 Server running on port: ${port}\n`);
       });
     } else {
       throw new Error("Invalid connection state!");
     }
   } catch (error: any) {
-    console.log(`Error: ${error.message}\n`);
+    console.error(`Error: ${error.message}\n`);
     process.exit(1);
   }
 })();

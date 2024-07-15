@@ -37,7 +37,7 @@ app.use((err, _req, res, next) => {
     }
 });
 app.get("/", (_req, res) => {
-    return res.status(200).send({ message: "Hello, from Vercel!" });
+    return res.status(200).send({ message: "Hello, from express on vercel!" });
 });
 const user_1 = __importDefault(require("./router/user"));
 app.use("/api/user", user_1.default);

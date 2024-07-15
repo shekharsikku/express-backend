@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { genSalt, hash, compare } from "bcryptjs";
 import { ZodSchema } from "zod";
+import { Types } from "mongoose";
 import jwt from "jsonwebtoken";
 import { ApiResponse, ValidationError } from "../utils";
 import env from "../utils/env";
@@ -42,7 +43,7 @@ const validateSchema =
       next();
     } catch (error: any) {
       const errors = ValidationError(error);
-      return ApiResponse(req, res, 400, error.name, { errors });
+      return ApiResponse(req, res, 400, error.name, null, errors);
     }
   };
 
@@ -51,13 +52,13 @@ const validateSchema =
  *
  * @param {Request} _req Request.
  * @param {Response} res Response.
- * @param {string} uid _id.
+ * @param {Types.ObjectId} uid _id.
  * @returns {object} Return pair of access and refresh token.
  */
 const generateToken = (
   _req: Request,
   res: Response,
-  uid: string
+  uid: Types.ObjectId
 ): { access: string; refresh: string } => {
   const access = jwt.sign({ uid }, env.ACCESS_TOKEN_SECRET, {
     algorithm: "HS256",

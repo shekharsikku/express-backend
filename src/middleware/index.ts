@@ -22,21 +22,21 @@ const accessToken = async (
     const token = req.cookies.access;
 
     if (!token) {
-      throw new ApiError(401, "Cannot access!");
+      throw new ApiError(401, "Unauthorized access request!");
     }
 
     const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as JwtPayload;
     const user = await User.findById(decoded.uid);
 
     if (!decoded || !user) {
-      throw new ApiError(403, "Invalid request!");
+      throw new ApiError(403, "Invalid access request!");
     }
 
     req.user = user;
     next();
   } catch (error: any) {
     if (error.name === "TokenExpiredError") {
-      return ApiResponse(req, res, 401, "Access expired!");
+      return ApiResponse(req, res, 401, "Access request expired!");
     }
     return ApiResponse(req, res, error.code, error.message);
   }
@@ -59,18 +59,17 @@ const refreshToken = async (
     const token = req.cookies.refresh;
 
     if (!token) {
-      throw new ApiError(401, "Unauthorized user!");
+      throw new ApiError(401, "Unauthorized user request!");
     }
 
     const decoded = jwt.verify(token, env.REFRESH_TOKEN_SECRET) as JwtPayload;
     const user = await User.findById(decoded?.uid).select("+refreshtoken");
 
     if (!decoded || !user || token !== user?.refreshtoken) {
-      throw new ApiError(401, "Invalid request!");
+      throw new ApiError(401, "Invalid user request!");
     }
 
-    const uid = String(user._id);
-    const { access, refresh } = generateToken(req, res, uid);
+    const { access, refresh } = generateToken(req, res, user._id);
 
     user.refreshtoken = refresh;
     await user.save({ validateBeforeSave: false });

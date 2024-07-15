@@ -17,7 +17,7 @@ const mongodb = (uri) => __awaiter(void 0, void 0, void 0, function* () {
         return connection.readyState;
     }
     catch (error) {
-        console.log(`Error: ${error.message}`);
+        console.error(`Error: ${error.message}`);
         process.exit(1);
     }
 });

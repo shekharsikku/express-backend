@@ -28,6 +28,7 @@ type ResponseType = {
   success: boolean;
   message: string;
   data?: any;
+  errors?: any;
 };
 
 /**
@@ -45,12 +46,14 @@ const ApiResponse = (
   res: Response,
   code: number,
   message: string,
-  data: any = null
+  data: any = null,
+  errors: any = null
 ) => {
   const success: boolean = code < 400 ? true : false;
   const response: ResponseType = { code, success, message };
 
   if (data) response.data = data;
+  if (errors) response.errors = errors;
   return res.status(code).send({ ...response });
 };
 

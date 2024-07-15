@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tokenRefresh = exports.sessionUser = exports.logoutUser = exports.loginUser = exports.registerUser = void 0;
+exports.deleteUserDetails = exports.updateUserDetails = exports.changeCurrentPassword = exports.tokenRefresh = exports.currentUser = exports.logoutUser = exports.loginUser = exports.registerUser = void 0;
 const utils_1 = require("../utils");
 const helper_1 = require("../helper");
 const user_1 = __importDefault(require("../model/user"));
@@ -60,8 +60,7 @@ const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         const checked = yield (0, helper_1.compareHash)(password, user.password);
         if (checked) {
-            const uid = String(user._id);
-            const { access, refresh } = (0, helper_1.generateToken)(req, res, uid);
+            const { access, refresh } = (0, helper_1.generateToken)(req, res, user._id);
             user.refreshtoken = refresh;
             yield user.save({ validateBeforeSave: false });
             return (0, utils_1.ApiResponse)(req, res, 200, "Logged in successfully!", {
@@ -76,8 +75,9 @@ const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.loginUser = loginUser;
-const logoutUser = (req, res, _next) => __awaiter(void 0, void 0, void 0, function* () {
-    yield user_1.default.findByIdAndUpdate(req.user._id, {
+const logoutUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    yield user_1.default.findByIdAndUpdate((_a = req.user) === null || _a === void 0 ? void 0 : _a._id, {
         $unset: {
             refreshtoken: 1, // this removes the field from document
         },
@@ -89,7 +89,7 @@ const logoutUser = (req, res, _next) => __awaiter(void 0, void 0, void 0, functi
     return (0, utils_1.ApiResponse)(req, res, 200, "Logged out successfully!");
 });
 exports.logoutUser = logoutUser;
-const sessionUser = (req, res, _next) => __awaiter(void 0, void 0, void 0, function* () {
+const currentUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const data = req.user;
         return (0, utils_1.ApiResponse)(req, res, 200, "Current session user data!", data);
@@ -98,7 +98,7 @@ const sessionUser = (req, res, _next) => __awaiter(void 0, void 0, void 0, funct
         return (0, utils_1.ApiResponse)(req, res, error.code, error.message);
     }
 });
-exports.sessionUser = sessionUser;
+exports.currentUser = currentUser;
 const tokenRefresh = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const user = req.user;
@@ -113,3 +113,83 @@ const tokenRefresh = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.tokenRefresh = tokenRefresh;
+const changeCurrentPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { old_password, new_password } = yield req.body;
+        const user = yield user_1.default.findById((_a = req.user) === null || _a === void 0 ? void 0 : _a._id).select("+password");
+        if (!user) {
+            throw new utils_1.ApiError(400, "Invalid change request!");
+        }
+        const checked = yield (0, helper_1.compareHash)(old_password, user === null || user === void 0 ? void 0 : user.password);
+        if (!checked) {
+            throw new utils_1.ApiError(403, "Invalid old password!");
+        }
+        user.password = yield (0, helper_1.generateHash)(new_password);
+        yield user.save({ validateBeforeSave: false });
+        return (0, utils_1.ApiResponse)(req, res, 202, "Password changed successfully!");
+    }
+    catch (error) {
+        return (0, utils_1.ApiResponse)(req, res, error.code, error.message);
+    }
+});
+exports.changeCurrentPassword = changeCurrentPassword;
+const updateUserDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { fullname, email, username } = yield req.body;
+        const existedUser = yield user_1.default.findOne({
+            $or: [{ username }, { email }],
+        });
+        if (existedUser) {
+            let field;
+            if (existedUser.username == username) {
+                field = "Username";
+            }
+            else {
+                field = "Email";
+            }
+            throw new utils_1.ApiError(409, `${field} already exists!`);
+        }
+        const updateObject = {};
+        if (username)
+            updateObject.username = username;
+        if (email)
+            updateObject.email = email;
+        if (fullname)
+            updateObject.fullname = fullname;
+        const result = yield user_1.default.updateOne({ _id: (_a = req.user) === null || _a === void 0 ? void 0 : _a._id }, { $set: updateObject });
+        if (result.modifiedCount === 1) {
+            return (0, utils_1.ApiResponse)(req, res, 200, "Details updated successfully!");
+        }
+        throw new utils_1.ApiError(500, "Details not updated!");
+    }
+    catch (error) {
+        return (0, utils_1.ApiResponse)(req, res, error.code, error.message);
+    }
+});
+exports.updateUserDetails = updateUserDetails;
+const deleteUserDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { current_password } = yield req.body;
+        const user = yield user_1.default.findById((_a = req.user) === null || _a === void 0 ? void 0 : _a._id).select("+password");
+        if (!user) {
+            throw new utils_1.ApiError(400, "Invalid delete request!");
+        }
+        const checked = yield (0, helper_1.compareHash)(current_password, user.password);
+        if (checked) {
+            const deletedUser = yield user.deleteOne();
+            if (deletedUser.deletedCount === 1) {
+                res.clearCookie("access");
+                res.clearCookie("refresh");
+                return (0, utils_1.ApiResponse)(req, res, 301, "User details deleted successfully!");
+            }
+        }
+        throw new utils_1.ApiError(403, "Invalid user password!");
+    }
+    catch (error) {
+        return (0, utils_1.ApiResponse)(req, res, error.code, error.message);
+    }
+});
+exports.deleteUserDetails = deleteUserDetails;

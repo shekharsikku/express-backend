@@ -1,7 +1,6 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { ApiError, ApiResponse } from "../utils";
 import { compareHash, generateHash, generateToken } from "../helper";
-import { Types } from "mongoose";
 import User from "../model/user";
 
 const registerUser = async (req: Request, res: Response) => {
@@ -56,8 +55,7 @@ const loginUser = async (req: Request, res: Response) => {
     const checked = await compareHash(password, user.password);
 
     if (checked) {
-      const uid = String(user._id);
-      const { access, refresh } = generateToken(req, res, uid);
+      const { access, refresh } = generateToken(req, res, user._id);
 
       user.refreshtoken = refresh;
       await user.save({ validateBeforeSave: false });
@@ -73,9 +71,9 @@ const loginUser = async (req: Request, res: Response) => {
   }
 };
 
-const logoutUser = async (req: Request, res: Response, _next: NextFunction) => {
+const logoutUser = async (req: Request, res: Response) => {
   await User.findByIdAndUpdate(
-    req.user._id,
+    req.user?._id,
     {
       $unset: {
         refreshtoken: 1, // this removes the field from document
@@ -91,11 +89,7 @@ const logoutUser = async (req: Request, res: Response, _next: NextFunction) => {
   return ApiResponse(req, res, 200, "Logged out successfully!");
 };
 
-const sessionUser = async (
-  req: Request,
-  res: Response,
-  _next: NextFunction
-) => {
+const currentUser = async (req: Request, res: Response) => {
   try {
     const data = req.user;
     return ApiResponse(req, res, 200, "Current session user data!", data);
@@ -117,4 +111,110 @@ const tokenRefresh = async (req: Request, res: Response) => {
   }
 };
 
-export { registerUser, loginUser, logoutUser, sessionUser, tokenRefresh };
+const changeCurrentPassword = async (req: Request, res: Response) => {
+  try {
+    const { old_password, new_password } = await req.body;
+
+    const user = await User.findById(req.user?._id).select("+password");
+
+    if (!user) {
+      throw new ApiError(400, "Invalid change request!");
+    }
+
+    const checked = await compareHash(old_password, user?.password!);
+
+    if (!checked) {
+      throw new ApiError(403, "Invalid old password!");
+    }
+
+    user.password = await generateHash(new_password);
+    await user.save({ validateBeforeSave: false });
+
+    return ApiResponse(req, res, 202, "Password changed successfully!");
+  } catch (error: any) {
+    return ApiResponse(req, res, error.code, error.message);
+  }
+};
+
+interface UpdateUserObject {
+  username?: string;
+  email?: string;
+  fullname?: string;
+}
+
+const updateUserDetails = async (req: Request, res: Response) => {
+  try {
+    const { fullname, email, username } = await req.body;
+
+    const existedUser = await User.findOne({
+      $or: [{ username }, { email }],
+    });
+
+    if (existedUser) {
+      let field;
+
+      if (existedUser.username == username) {
+        field = "Username";
+      } else {
+        field = "Email";
+      }
+      throw new ApiError(409, `${field} already exists!`);
+    }
+
+    const updateObject: UpdateUserObject = {};
+
+    if (username) updateObject.username = username;
+    if (email) updateObject.email = email;
+    if (fullname) updateObject.fullname = fullname;
+
+    const result = await User.updateOne(
+      { _id: req.user?._id },
+      { $set: updateObject }
+    );
+
+    if (result.modifiedCount === 1) {
+      return ApiResponse(req, res, 200, "Details updated successfully!");
+    }
+    throw new ApiError(500, "Details not updated!");
+  } catch (error: any) {
+    return ApiResponse(req, res, error.code, error.message);
+  }
+};
+
+const deleteUserDetails = async (req: Request, res: Response) => {
+  try {
+    const { current_password } = await req.body;
+
+    const user = await User.findById(req.user?._id).select("+password");
+
+    if (!user) {
+      throw new ApiError(400, "Invalid delete request!");
+    }
+
+    const checked = await compareHash(current_password, user.password);
+
+    if (checked) {
+      const deletedUser = await user.deleteOne();
+
+      if (deletedUser.deletedCount === 1) {
+        res.clearCookie("access");
+        res.clearCookie("refresh");
+        return ApiResponse(req, res, 301, "User details deleted successfully!");
+      }
+    }
+    throw new ApiError(403, "Invalid user password!");
+  } catch (error: any) {
+    return ApiResponse(req, res, error.code, error.message);
+  }
+};
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  currentUser,
+  tokenRefresh,
+  changeCurrentPassword,
+  updateUserDetails,
+  deleteUserDetails,
+};

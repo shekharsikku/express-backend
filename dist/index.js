@@ -22,7 +22,7 @@ const port = env_1.default.PORT;
         const state = yield (0, database_1.default)(uri);
         if (state == 1) {
             app_1.default.listen(port, () => {
-                console.log(`Running at: http://localhost:${port}\n`);
+                console.log(`🚀 Server running on port: ${port}\n`);
             });
         }
         else {
@@ -30,7 +30,7 @@ const port = env_1.default.PORT;
         }
     }
     catch (error) {
-        console.log(`Error: ${error.message}\n`);
+        console.error(`Error: ${error.message}\n`);
         process.exit(1);
     }
 }))();
