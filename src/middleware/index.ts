@@ -1,85 +1,151 @@
 import { NextFunction, Request, Response } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
 import { ApiError, ApiResponse } from "../utils";
-import { generateToken } from "../helper";
+import { UserInterface } from "../interface";
+import { Types } from "mongoose";
+import {
+  generateAccess,
+  generateRefresh,
+  createAccessData,
+  authorizeCookie,
+} from "../helper";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import User from "../model/user";
 import env from "../utils/env";
 
-/**
- * Middleware function for access resource using access token.
- *
- * @param {Request} req
- * @param {Response} res
- * @param {NextFunction} next
- * @returns {NextFunction} Pass handler to next controller function if access token validate successfully.
- */
-const accessToken = async (
+const authAccess = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<any> => {
   try {
-    const token = req.cookies.access;
+    const accessToken = req.cookies.access;
 
-    if (!token) {
+    if (!accessToken) {
       throw new ApiError(401, "Unauthorized access request!");
     }
 
-    const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as JwtPayload;
-    const user = await User.findById(decoded.uid);
+    let decodedPayload;
 
-    if (!decoded || !user) {
+    try {
+      decodedPayload = jwt.verify(accessToken, env.ACCESS_SECRET, {
+        algorithms: ["HS256"],
+      }) as JwtPayload;
+    } catch (error: any) {
       throw new ApiError(403, "Invalid access request!");
     }
 
-    req.user = user;
+    req.user = decodedPayload.user as UserInterface;
     next();
   } catch (error: any) {
-    if (error.name === "TokenExpiredError") {
-      return ApiResponse(req, res, 401, "Access request expired!");
-    }
-    return ApiResponse(req, res, error.code, error.message);
+    return ApiResponse(res, error.code, error.message);
   }
 };
 
-/**
- * Middleware function for refresh expired access token.
- *
- * @param {Request} req
- * @param {Response} res
- * @param {NextFunction} next
- * @returns {NextFunction} Pass handler to next controller function if expired access token refreshed successfully.
- */
-const refreshToken = async (
+const deleteToken = async (
+  req: Request,
+  res: Response,
+  userId: Types.ObjectId,
+  refreshToken: string
+) => {
+  const authorizeId = req.cookies.auth_id;
+
+  const deleteResponse = await User.findOneAndUpdate(
+    { _id: userId },
+    {
+      $pull: {
+        authentication: { _id: authorizeId, token: refreshToken },
+      },
+    },
+    { new: true }
+  );
+
+  if (deleteResponse) {
+    res.clearCookie("access");
+    res.clearCookie("refresh");
+    res.clearCookie("auth_id");
+  }
+};
+
+const authRefresh = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<any> => {
   try {
-    const token = req.cookies.refresh;
+    const refreshToken = req.cookies.refresh;
 
-    if (!token) {
-      throw new ApiError(401, "Unauthorized user request!");
+    if (!refreshToken) {
+      throw new ApiError(401, "Unauthorized refresh request!");
     }
 
-    const decoded = jwt.verify(token, env.REFRESH_TOKEN_SECRET) as JwtPayload;
-    const user = await User.findById(decoded?.uid).select("+refreshtoken");
+    let decodedPayload;
 
-    if (!decoded || !user || token !== user?.refreshtoken) {
-      throw new ApiError(401, "Invalid user request!");
+    try {
+      decodedPayload = jwt.verify(refreshToken, env.REFRESH_SECRET, {
+        algorithms: ["HS512"],
+        ignoreExpiration: true,
+        ignoreNotBefore: true,
+      }) as JwtPayload;
+    } catch (error: any) {
+      throw new ApiError(401, "Invalid refresh request!");
     }
 
-    const { access, refresh } = generateToken(req, res, user._id);
+    const userId = decodedPayload.uid as Types.ObjectId;
+    const currentTime = Math.floor(Date.now() / 1000);
+    const beforeExpires = decodedPayload.exp! - parseInt(env.ACCESS_EXPIRY);
 
-    user.refreshtoken = refresh;
-    await user.save({ validateBeforeSave: false });
+    const requestUser = await User.findOne({
+      _id: userId,
+      authentication: {
+        $elemMatch: { token: refreshToken },
+      },
+    });
 
-    const tokens = { access, refresh };
-    req.token = tokens;
+    if (!requestUser) {
+      throw new ApiError(403, "Invalid user request!");
+    }
+
+    const accessData = createAccessData(requestUser);
+
+    if (currentTime >= beforeExpires && currentTime < decodedPayload.exp!) {
+      const newRefreshToken = generateRefresh(res, userId);
+      const refreshExpiry = parseInt(env.REFRESH_EXPIRY!);
+      const authorizeId = req.cookies.auth_id;
+
+      const updatedAuth = await User.findOneAndUpdate(
+        {
+          _id: userId,
+          authentication: {
+            $elemMatch: { _id: authorizeId, token: refreshToken },
+          },
+        },
+        {
+          $set: {
+            "authentication.$.token": newRefreshToken,
+            "authentication.$.expiry": new Date(
+              Date.now() + refreshExpiry * 1000
+            ),
+          },
+        },
+        { new: true }
+      );
+
+      if (updatedAuth) {
+        authorizeCookie(res, authorizeId!);
+        const accessToken = generateAccess(res, accessData);
+      }
+    } else if (currentTime >= decodedPayload.exp!) {
+      await deleteToken(req, res, requestUser._id, refreshToken);
+      throw new ApiError(401, "Please, login again to continue!");
+    } else {
+      const accessToken = generateAccess(res, accessData);
+    }
+
+    req.user = requestUser;
     next();
   } catch (error: any) {
-    return ApiResponse(req, res, error.code, error.message);
+    return ApiResponse(res, error.code, error.message);
   }
 };
 
-export { accessToken, refreshToken };
+export { authAccess, authRefresh };
