@@ -11,6 +11,7 @@ import {
 import jwt, { JwtPayload } from "jsonwebtoken";
 import User from "../model/user";
 import env from "../utils/env";
+import multer from "multer";
 
 const authAccess = async (
   req: Request,
@@ -148,4 +149,15 @@ const authRefresh = async (
   }
 };
 
-export { authAccess, authRefresh };
+const storage = multer.diskStorage({
+  destination: function (_req, _file, cb) {
+    cb(null, "./public/temp");
+  },
+  filename: function (_req, file, cb) {
+    cb(null, file.originalname);
+  },
+});
+
+const upload = multer({ storage });
+
+export { authAccess, authRefresh, upload };
