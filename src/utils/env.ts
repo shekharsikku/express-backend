@@ -4,20 +4,21 @@ import { cleanEnv, str, port } from "envalid";
 dotenv.config();
 
 const env = cleanEnv(process.env, {
-  DATABASE_URL: str(),
+  MAILTRAP_TOKEN: str(),
+  MAILTRAP_ENDPOINT: str(),
 
-  ACCESS_TOKEN_SECRET: str(),
-  ACCESS_TOKEN_EXPIRY: str(),
-  ACCESS_COOKIE_EXPIRY: str(),
-  
-  REFRESH_TOKEN_SECRET: str(),
-  REFRESH_TOKEN_EXPIRY: str(),
-  REFRESH_COOKIE_EXPIRY: str(),
+  ACCESS_SECRET: str(),
+  ACCESS_EXPIRY: str(),
+
+  REFRESH_SECRET: str(),
+  REFRESH_EXPIRY: str(),
 
   COOKIES_SECRET: str(),
-
-  CORS_ORIGIN: str(),
+  PAYLOAD_LIMIT: str(),
   PORT: port(),
+
+  MONGODB_URI: str(),
+  CORS_ORIGIN: str(),
   NODE_ENV: str(),
 });
 

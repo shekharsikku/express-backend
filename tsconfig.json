@@ -37,10 +37,10 @@
     "files": true
   },
   "include": [
-    "src/**/*.ts",
+    "src",
+    "dist"
   ],
   "exclude": [
     "node_modules",
-    "dist"
   ]
 }
