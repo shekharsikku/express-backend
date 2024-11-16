@@ -1,90 +1,140 @@
-import { NextFunction, Request, Response } from "express";
 import { genSalt, hash, compare } from "bcryptjs";
-import { ZodSchema } from "zod";
+import { UserInterface } from "../interface";
+import { Response } from "express";
 import { Types } from "mongoose";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { ApiResponse, ValidationError } from "../utils";
 import env from "../utils/env";
 
-/**
- * Generate hash of plain password.
- *
- * @async
- * @param {string} password Plain password.
- * @returns {Promise<string>} Hashed password.
- */
-const generateHash = async (password: string): Promise<string> => {
-  const salt = await genSalt(13);
-  const hashed = await hash(password, salt);
+const generateHash = async (plain: string): Promise<string> => {
+  const salt = await genSalt(12);
+  const hashed = await hash(plain, salt);
   return hashed;
 };
 
-/**
- * Compare plain password and hashed password.
- *
- * @async
- * @param {string} password Plain password.
- * @param {string} hashed Hashed password.
- * @returns {Promise<boolean>} Return boolean result after comparing plain and hashed password.
- */
-const compareHash = async (
-  password: string,
-  hashed: string
-): Promise<boolean> => {
-  const checked = await compare(password, hashed);
+const compareHash = async (plain: string, hashed: string): Promise<boolean> => {
+  const checked = await compare(plain, hashed);
   return checked;
 };
 
-/** Validate incoming req.body and pass to handler function. */
-const validateSchema =
-  (schema: ZodSchema) => (req: Request, res: Response, next: NextFunction) => {
-    try {
-      schema.parse(req.body);
-      next();
-    } catch (error: any) {
-      const errors = ValidationError(error);
-      return ApiResponse(req, res, 400, error.name, null, errors);
-    }
-  };
+const generateAccess = (res: Response, user?: UserInterface) => {
+  const accessExpiry = parseInt(env.ACCESS_EXPIRY);
 
-/**
- * Generate access and refresh token and set cookies.
- *
- * @param {Request} _req Request.
- * @param {Response} res Response.
- * @param {Types.ObjectId} uid _id.
- * @returns {object} Return pair of access and refresh token.
- */
-const generateToken = (
-  _req: Request,
-  res: Response,
-  uid: Types.ObjectId
-): { access: string; refresh: string } => {
-  const access = jwt.sign({ uid }, env.ACCESS_TOKEN_SECRET, {
+  const accessToken = jwt.sign({ user }, env.ACCESS_SECRET, {
     algorithm: "HS256",
-    expiresIn: parseInt(env.ACCESS_TOKEN_EXPIRY),
+    expiresIn: accessExpiry,
   });
 
-  const refresh = jwt.sign({ uid }, env.REFRESH_TOKEN_SECRET, {
-    algorithm: "HS256",
-    expiresIn: parseInt(env.REFRESH_TOKEN_EXPIRY),
-  });
-
-  res.cookie("access", access, {
-    maxAge: parseInt(env.ACCESS_COOKIE_EXPIRY),
+  res.cookie("access", accessToken, {
+    maxAge: accessExpiry * 1000,
     httpOnly: true,
     sameSite: "strict",
     secure: env.NODE_ENV !== "development",
   });
 
-  res.cookie("refresh", refresh, {
-    maxAge: parseInt(env.REFRESH_COOKIE_EXPIRY),
-    httpOnly: true,
-    sameSite: "strict",
-    secure: env.NODE_ENV !== "development",
-  });
-
-  return { access, refresh };
+  return accessToken;
 };
 
-export { generateHash, compareHash, validateSchema, generateToken };
+const generateRefresh = (res: Response, uid: Types.ObjectId) => {
+  const refreshExpiry = parseInt(env.REFRESH_EXPIRY);
+
+  const refreshToken = jwt.sign({ uid }, env.REFRESH_SECRET, {
+    algorithm: "HS512",
+    expiresIn: refreshExpiry,
+  });
+
+  res.cookie("refresh", refreshToken, {
+    maxAge: refreshExpiry * 1000 * 2,
+    httpOnly: true,
+    sameSite: "strict",
+    secure: env.NODE_ENV !== "development",
+  });
+
+  return refreshToken;
+};
+
+const authorizeCookie = (res: Response, authorizeId: string) => {
+  const authExpiry = parseInt(env.REFRESH_EXPIRY!);
+
+  if (authorizeId) {
+    res.cookie("auth_id", authorizeId, {
+      maxAge: authExpiry * 1000 * 2,
+      httpOnly: true,
+      sameSite: "strict",
+      secure: env.NODE_ENV !== "development",
+    });
+  }
+};
+
+const hasEmptyField = (fields: object) => {
+  return Object.values(fields).some(
+    (value) => value === "" || value === undefined || value === null
+  );
+};
+
+const removeSpaces = (str: string) => {
+  return str.replace(/\s+/g, "");
+};
+
+const capitalizeWord = (str: string) => {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
+const capitalizeWords = (str: string) => {
+  return str
+    .split(" ")
+    .map((word) => capitalizeWord(word))
+    .join(" ");
+};
+
+const maskedObjectId = (objectId: Types.ObjectId) => {
+  const idStr = objectId.toString();
+  const maskedId = idStr.slice(0, 4) + "****" + idStr.slice(-4);
+  return maskedId;
+};
+
+const maskedEmail = (email: string) => {
+  const [localPart, domain] = email.split("@");
+  const maskedLocalPart = localPart.slice(0, 4) + "***";
+  return `${maskedLocalPart}@${domain}`;
+};
+
+const maskedDetails = (details: UserInterface) => {
+  const maskId = maskedObjectId(details._id!);
+  const maskEmail = maskedEmail(details.email);
+  return {
+    _id: maskId,
+    email: maskEmail,
+    setup: details.setup!,
+  };
+};
+
+const createAccessData = (user: UserInterface) => {
+  const accessData = {
+    ...user.toObject(),
+    password: undefined,
+    authentication: undefined,
+  };
+  return accessData as UserInterface;
+};
+
+const generateSecureCode = (length = 6) => {
+  const digits = "0123456789";
+  const code = Array.from(crypto.randomBytes(length))
+    .map((byte) => digits[byte % digits.length])
+    .join("");
+  return code;
+};
+
+export {
+  generateHash,
+  compareHash,
+  generateAccess,
+  generateRefresh,
+  authorizeCookie,
+  hasEmptyField,
+  removeSpaces,
+  maskedDetails,
+  createAccessData,
+  generateSecureCode,
+};
