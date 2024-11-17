@@ -32,3 +32,11 @@ interface TokenInterface {
   access?: string;
   refresh?: string;
 }
+
+interface DetailInterface {
+  name?: string;
+  username?: string;
+  gender?: "Male" | "Female" | "Other";
+  bio?: string;
+  setup?: boolean;
+}

@@ -6,6 +6,8 @@ import {
   forgetSchema,
   resetSchema,
   loginSchema,
+  profileSchema,
+  passwordSchema,
 } from "../utils/schema";
 import {
   registerUser,
@@ -15,8 +17,11 @@ import {
   loginUser,
   logoutUser,
   userInformation,
+  refreshAuth,
+  profileSetup,
+  changePassword,
 } from "../controller/user";
-import { authAccess } from "../middleware";
+import { authAccess, authRefresh } from "../middleware";
 
 const router = Router();
 
@@ -28,27 +33,20 @@ router.post("/login", validateSchema(loginSchema), loginUser);
 
 router.delete("/logout", authAccess, logoutUser);
 
-// router.delete(
-//   "/delete-user",
-//   validateSchema(deleteUserSchema),
-//   accessToken,
-//   deleteUserDetails
-// );
-
-// router.patch("/refresh-token", refreshToken, tokenRefresh);
-// router.patch(
-//   "/change-password",
-//   validateSchema(changePasswordSchema),
-//   accessToken,
-//   changeCurrentPassword
-// );
-// router.patch(
-//   "/update-details",
-//   validateSchema(updateDetailsSchema),
-//   accessToken,
-//   updateUserDetails
-// );
+router.patch(
+  "/change-password",
+  authAccess,
+  validateSchema(passwordSchema),
+  changePassword
+);
+router.patch(
+  "/profile-setup",
+  authAccess,
+  validateSchema(profileSchema),
+  profileSetup
+);
 
 router.get("/user-information", authAccess, userInformation);
+router.get("/auth-refresh", authRefresh, refreshAuth);
 
 export default router;

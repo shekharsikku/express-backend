@@ -27,7 +27,7 @@ const UserSchema = new Schema<UserInterface>(
     gender: {
       type: String,
       enum: ["Male", "Female", "Other"],
-      default: null,
+      default: "Other",
     },
     image: {
       type: String,

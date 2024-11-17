@@ -8,7 +8,9 @@ import {
   generateHash,
   generateRefresh,
   generateSecureCode,
+  hasEmptyField,
   maskedDetails,
+  removeSpaces,
 } from "../helper";
 import {
   sendWelcomeEmail,
@@ -16,6 +18,7 @@ import {
   sendPasswordResetEmail,
   sendResetSuccessEmail,
 } from "../config/email";
+import { DetailInterface } from "../interface";
 import User from "../model/user";
 import env from "../utils/env";
 
@@ -377,7 +380,7 @@ export const logoutUser = async (req: Request, res: Response) => {
     await User.findByIdAndUpdate(
       { _id: requestUser._id },
       {
-        active: Date.now,
+        active: Date.now(),
         $pull: {
           authentication: { _id: authorizeId, token: refreshToken },
         },
@@ -416,112 +419,104 @@ export const userInformation = async (req: Request, res: Response) => {
   }
 };
 
-// const tokenRefresh = async (req: Request, res: Response) => {
-//   try {
-//     const user = req.user;
-//     const token = req.token;
-//     return ApiResponse(req, res, 200, "Token refreshed successfully!", {
-//       id: user?._id,
-//       token,
-//     });
-//   } catch (error: any) {
-//     return ApiResponse(req, res, error.code, error.message);
-//   }
-// };
+export const profileSetup = async (req: Request, res: Response) => {
+  try {
+    const details = await req.body;
+    const username = removeSpaces(details?.username);
+    const requestUser = req.user!;
 
-// const changeCurrentPassword = async (req: Request, res: Response) => {
-//   try {
-//     const { old_password, new_password } = await req.body;
+    if (username !== requestUser?.username) {
+      const existsUsername = await User.findOne({ username });
 
-//     const user = await User.findById(req.user?._id).select("+password");
+      if (existsUsername) {
+        throw new ApiError(409, "Username already exists!");
+      }
+    }
 
-//     if (!user) {
-//       throw new ApiError(400, "Invalid change request!");
-//     }
+    const updateDetails: DetailInterface = {
+      name: details.name,
+      username,
+      gender: details.gender,
+      bio: details.bio,
+    };
 
-//     const checked = await compareHash(old_password, user?.password!);
+    const isEmpty = hasEmptyField({
+      name: details.name,
+      username,
+      gender: details.gender,
+    });
 
-//     if (!checked) {
-//       throw new ApiError(403, "Invalid old password!");
-//     }
+    if (!isEmpty) {
+      updateDetails.setup = true;
+    }
 
-//     user.password = await generateHash(new_password);
-//     await user.save({ validateBeforeSave: false });
+    const updatedProfile = await User.findByIdAndUpdate(
+      requestUser?._id,
+      { ...updateDetails },
+      { new: true }
+    );
 
-//     return ApiResponse(req, res, 202, "Password changed successfully!");
-//   } catch (error: any) {
-//     return ApiResponse(req, res, error.code, error.message);
-//   }
-// };
+    if (!updatedProfile) {
+      throw new ApiError(400, "Profile setup not completed!");
+    } else if (!updatedProfile.setup) {
+      const userData = maskedDetails(updatedProfile);
+      return ApiResponse(res, 200, "Please, complete your profile!", userData);
+    }
 
-// interface UpdateUserObject {
-//   username?: string;
-//   email?: string;
-//   fullName?: string;
-// }
+    const accessData = createAccessData(updatedProfile);
+    const accessToken = generateAccess(res, accessData);
 
-// const updateUserDetails = async (req: Request, res: Response) => {
-//   try {
-//     const { fullName, email, username } = await req.body;
+    return ApiResponse(res, 200, "Profile updated successfully!", accessData);
+  } catch (error: any) {
+    console.error("Error:", error.message);
 
-//     const existedUser = await User.findOne({
-//       $or: [{ username }, { email }],
-//     });
+    return ApiResponse(
+      res,
+      error.code || 500,
+      error.message || "Internal server error!"
+    );
+  }
+};
 
-//     if (existedUser) {
-//       let field;
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const { old_password, new_password } = await req.body;
 
-//       if (existedUser.username == username) {
-//         field = "Username";
-//       } else {
-//         field = "Email";
-//       }
-//       throw new ApiError(409, `${field} already exists!`);
-//     }
+    const requestUser = await User.findById(req.user?._id).select("+password");
 
-//     const updateObject: UpdateUserObject = {};
+    if (!requestUser) {
+      throw new ApiError(403, "Invalid authorization!");
+    }
 
-//     if (username) updateObject.username = username;
-//     if (email) updateObject.email = email;
-//     if (fullName) updateObject.fullName = fullName;
+    if (old_password === new_password) {
+      throw new ApiError(400, "Please, choose a different password!");
+    }
 
-//     const result = await User.updateOne(
-//       { _id: req.user?._id },
-//       { $set: updateObject }
-//     );
+    const validatePassword = await compareHash(
+      old_password,
+      requestUser.password!
+    );
 
-//     if (result.modifiedCount === 1) {
-//       return ApiResponse(req, res, 200, "Details updated successfully!");
-//     }
-//     throw new ApiError(500, "Details not updated!");
-//   } catch (error: any) {
-//     return ApiResponse(req, res, error.code, error.message);
-//   }
-// };
+    if (!validatePassword) {
+      throw new ApiError(403, "Incorrect old password!");
+    }
 
-// const deleteUserDetails = async (req: Request, res: Response) => {
-//   try {
-//     const { current_password } = await req.body;
+    const hashedPassword = await generateHash(new_password);
 
-//     const user = await User.findById(req.user?._id).select("+password");
+    requestUser.password = hashedPassword;
+    await requestUser.save({ validateBeforeSave: true });
 
-//     if (!user) {
-//       throw new ApiError(400, "Invalid delete request!");
-//     }
+    const accessData = createAccessData(requestUser);
+    const accessToken = generateAccess(res, accessData);
 
-//     const checked = await compareHash(current_password, user.password);
+    return ApiResponse(res, 200, "Password changed successfully!", accessData);
+  } catch (error: any) {
+    console.error("Error:", error.message);
 
-//     if (checked) {
-//       const deletedUser = await user.deleteOne();
-
-//       if (deletedUser.deletedCount === 1) {
-//         res.clearCookie("access");
-//         res.clearCookie("refresh");
-//         return ApiResponse(req, res, 301, "User details deleted successfully!");
-//       }
-//     }
-//     throw new ApiError(403, "Invalid user password!");
-//   } catch (error: any) {
-//     return ApiResponse(req, res, error.code, error.message);
-//   }
-// };
+    return ApiResponse(
+      res,
+      error.code || 500,
+      error.message || "Internal server error!"
+    );
+  }
+};
