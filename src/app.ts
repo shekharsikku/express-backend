@@ -8,6 +8,7 @@ import cookieParser from "cookie-parser";
 import compression from "compression";
 import morgan from "morgan";
 import cors from "cors";
+import path from "path";
 import env from "./utils/env";
 
 const app = express();
@@ -35,16 +36,18 @@ app.use(
 
 app.use(compression());
 app.use(cookieParser(env.COOKIES_SECRET));
+app.use("/public/temp", express.static(path.join(__dirname, "../public/temp")));
 
 if (env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// import UserRouter from "./router/user";
-// app.use("/api/user", UserRouter);
+import UserRouter from "./router/user";
 
-app.get("/", (_req: Request, res: Response) => {
-  return res.status(200).send({ message: "Hello, from express on vercel! " });
+app.use("/api/user", UserRouter);
+
+app.all("*path", (_req: Request, res: Response) => {
+  res.status(200).send({ message: "Hello, from Express via Vercel!" });
 });
 
 app.use(((err: any, _req: Request, res: Response, _next: NextFunction) => {
