@@ -11,3 +11,6 @@ node_modules
 
 # typescript build info
 *.tsbuildinfo
+
+# txt files
+*.txt

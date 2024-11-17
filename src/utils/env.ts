@@ -6,6 +6,7 @@ dotenv.config();
 const env = cleanEnv(process.env, {
   MAILTRAP_TOKEN: str(),
   MAILTRAP_ENDPOINT: str(),
+  MAILTRAP_EMAIL: str(),
 
   ACCESS_SECRET: str(),
   ACCESS_EXPIRY: str(),
