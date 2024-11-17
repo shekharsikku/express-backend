@@ -1,51 +1,54 @@
 import { Router } from "express";
-import { validateSchema } from "../helper";
 import {
-  changePasswordSchema,
-  loginSchema,
+  validateSchema,
   registerSchema,
-  updateDetailsSchema,
-  deleteUserSchema,
+  verifySchema,
+  forgetSchema,
+  resetSchema,
+  loginSchema,
 } from "../utils/schema";
-import { accessToken, refreshToken } from "../middleware";
 import {
+  registerUser,
+  verifyEmail,
+  forgetPassword,
+  resetPassword,
   loginUser,
   logoutUser,
-  registerUser,
-  currentUser,
-  tokenRefresh,
-  changeCurrentPassword,
-  updateUserDetails,
-  deleteUserDetails
+  userInformation,
 } from "../controller/user";
+import { authAccess } from "../middleware";
 
 const router = Router();
 
 router.post("/register", validateSchema(registerSchema), registerUser);
+router.post("/verify-email", validateSchema(verifySchema), verifyEmail);
+router.post("/forget-password", validateSchema(forgetSchema), forgetPassword);
+router.post("/reset-password", validateSchema(resetSchema), resetPassword);
 router.post("/login", validateSchema(loginSchema), loginUser);
 
-router.delete("/logout", accessToken, logoutUser);
-router.delete(
-  "/delete-user",
-  validateSchema(deleteUserSchema),
-  accessToken,
-  deleteUserDetails
-);
+router.delete("/logout", authAccess, logoutUser);
 
-router.patch("/refresh-token", refreshToken, tokenRefresh);
-router.patch(
-  "/change-password",
-  validateSchema(changePasswordSchema),
-  accessToken,
-  changeCurrentPassword
-);
-router.patch(
-  "/update-details",
-  validateSchema(updateDetailsSchema),
-  accessToken,
-  updateUserDetails
-);
+// router.delete(
+//   "/delete-user",
+//   validateSchema(deleteUserSchema),
+//   accessToken,
+//   deleteUserDetails
+// );
 
-router.get("/current-user", accessToken, currentUser);
+// router.patch("/refresh-token", refreshToken, tokenRefresh);
+// router.patch(
+//   "/change-password",
+//   validateSchema(changePasswordSchema),
+//   accessToken,
+//   changeCurrentPassword
+// );
+// router.patch(
+//   "/update-details",
+//   validateSchema(updateDetailsSchema),
+//   accessToken,
+//   updateUserDetails
+// );
+
+router.get("/user-information", authAccess, userInformation);
 
 export default router;
