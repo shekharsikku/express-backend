@@ -41,6 +41,7 @@ const UserSchema = new Schema<UserInterface>(
       type: Boolean,
       default: false,
     },
+    friends: [{ type: Schema.Types.ObjectId, ref: "User" }],
     authentication: {
       type: [
         {
@@ -53,22 +54,6 @@ const UserSchema = new Schema<UserInterface>(
         },
       ],
       select: false,
-    },
-    verified: {
-      type: Boolean,
-      default: false,
-    },
-    active: {
-      type: Date,
-      default: Date.now,
-    },
-    verification: {
-      code: { type: String },
-      expiry: { type: Date },
-    },
-    reset: {
-      code: { type: String },
-      expiry: { type: Date },
     },
   },
   {

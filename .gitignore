@@ -14,3 +14,7 @@ node_modules
 
 # txt files
 *.txt
+
+# other dir
+configs
+redis

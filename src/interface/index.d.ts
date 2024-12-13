@@ -10,22 +10,19 @@ interface UserInterface extends Document {
   image?: string;
   bio?: string;
   setup?: boolean;
+  friends: Types.ObjectId[];
   authentication?: {
     _id?: Types.ObjectId;
     token: string;
     expiry: Date;
     device?: string;
   }[];
-  verified?: boolean;
-  active?: Date;
-  verification?: {
-    code: string;
-    expiry: Date;
-  };
-  reset?: {
-    code: string;
-    expiry: Date;
-  };
+}
+
+interface RequestsInterface extends Document {
+  requester: Types.ObjectId;
+  recipient: Types.ObjectId;
+  status: "pending" | "accepted" | "rejected";
 }
 
 interface TokenInterface {

@@ -10,6 +10,7 @@ import morgan from "morgan";
 import cors from "cors";
 import path from "path";
 import env from "./utils/env";
+import ApiRouters from "./routers";
 
 const app = express();
 
@@ -38,13 +39,15 @@ app.use(compression());
 app.use(cookieParser(env.COOKIES_SECRET));
 app.use("/public/temp", express.static(path.join(__dirname, "../public/temp")));
 
-if (env.NODE_ENV === "development") {
+/** Morgan logging middleware */
+if (env.isDev) {
   app.use(morgan("dev"));
+} else {
+  app.use(morgan("tiny"));
 }
 
-import UserRouter from "./router/user";
-
-app.use("/api/user", UserRouter);
+/** Api router middleware */
+app.use("/api", ApiRouters);
 
 app.all("*path", (_req: Request, res: Response) => {
   res.status(200).send({ message: "Hello, from Express via Vercel!" });

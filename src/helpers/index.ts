@@ -18,7 +18,7 @@ const compareHash = async (plain: string, hashed: string): Promise<boolean> => {
 };
 
 const generateAccess = (res: Response, user?: UserInterface) => {
-  const accessExpiry = parseInt(env.ACCESS_EXPIRY);
+  const accessExpiry = env.ACCESS_EXPIRY;
 
   const accessToken = jwt.sign({ user }, env.ACCESS_SECRET, {
     algorithm: "HS256",
@@ -29,14 +29,14 @@ const generateAccess = (res: Response, user?: UserInterface) => {
     maxAge: accessExpiry * 1000,
     httpOnly: true,
     sameSite: "strict",
-    secure: env.NODE_ENV !== "development",
+    secure: env.isProd,
   });
 
   return accessToken;
 };
 
 const generateRefresh = (res: Response, uid: Types.ObjectId) => {
-  const refreshExpiry = parseInt(env.REFRESH_EXPIRY);
+  const refreshExpiry = env.REFRESH_EXPIRY;
 
   const refreshToken = jwt.sign({ uid }, env.REFRESH_SECRET, {
     algorithm: "HS512",
@@ -47,23 +47,21 @@ const generateRefresh = (res: Response, uid: Types.ObjectId) => {
     maxAge: refreshExpiry * 1000 * 2,
     httpOnly: true,
     sameSite: "strict",
-    secure: env.NODE_ENV !== "development",
+    secure: env.isProd,
   });
 
   return refreshToken;
 };
 
-const authorizeCookie = (res: Response, authorizeId: string) => {
-  const authExpiry = parseInt(env.REFRESH_EXPIRY!);
+const authorizeCookie = (res: Response, authId: string) => {
+  const authExpiry = env.REFRESH_EXPIRY;
 
-  if (authorizeId) {
-    res.cookie("auth_id", authorizeId, {
-      maxAge: authExpiry * 1000 * 2,
-      httpOnly: true,
-      sameSite: "strict",
-      secure: env.NODE_ENV !== "development",
-    });
-  }
+  res.cookie("auth_id", authId, {
+    maxAge: authExpiry * 1000 * 2,
+    httpOnly: true,
+    sameSite: "strict",
+    secure: env.isProd,
+  });
 };
 
 const hasEmptyField = (fields: object) => {
@@ -118,6 +116,17 @@ const createAccessData = (user: UserInterface) => {
   return accessData as UserInterface;
 };
 
+const publicIpAddress = async () => {
+  try {
+    const response = await fetch(env.IPIFY_ADDRESS_URL);
+    const result = await response.json();
+    return result;
+  } catch (error: any) {
+    console.log(`Error: ${error.message}`);
+    return null;
+  }
+};
+
 const generateSecureCode = (length = 6) => {
   const digits = "0123456789";
   const code = Array.from(crypto.randomBytes(length))
@@ -136,5 +145,6 @@ export {
   removeSpaces,
   maskedDetails,
   createAccessData,
+  publicIpAddress,
   generateSecureCode,
 };

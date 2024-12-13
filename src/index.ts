@@ -1,4 +1,4 @@
-import mongodb from "./database";
+import mongodb from "./mongodb";
 import env from "./utils/env";
 import app from "./app";
 
