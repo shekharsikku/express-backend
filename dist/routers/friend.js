@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const middlewares_1 = require("../middlewares");
+const friend_1 = require("../controllers/friend");
+const router = (0, express_1.Router)();
+router.post("/request-send", middlewares_1.authAccess, friend_1.sendRequest);
+router.patch("/request-handle", middlewares_1.authAccess, friend_1.handleRequest);
+router.delete("/request-retrieve", middlewares_1.authAccess, friend_1.retrieveRequest);
+router.delete("/unfriend", middlewares_1.authAccess, friend_1.unfriendUser);
+router.get("/request-pending", middlewares_1.authAccess, friend_1.pendingRequests);
+router.get("/fetch", middlewares_1.authAccess, friend_1.fetchFriends);
+exports.default = router;

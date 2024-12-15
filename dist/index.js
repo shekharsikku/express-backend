@@ -12,21 +12,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const database_1 = __importDefault(require("./database"));
+const mongodb_1 = __importDefault(require("./mongodb"));
 const env_1 = __importDefault(require("./utils/env"));
 const app_1 = __importDefault(require("./app"));
-const uri = env_1.default.DATABASE_URL;
+const uri = env_1.default.MONGODB_URI;
 const port = env_1.default.PORT;
 (() => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const state = yield (0, database_1.default)(uri);
+        const state = yield (0, mongodb_1.default)(uri);
         if (state == 1) {
+            console.log("Database connection success!");
             app_1.default.listen(port, () => {
-                console.log(`🚀 Server running on port: ${port}\n`);
+                console.log(`Server running on port: ${port}\n`);
             });
         }
         else {
-            throw new Error("Invalid connection state!");
+            throw new Error("Database connection error!");
         }
     }
     catch (error) {

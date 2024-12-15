@@ -2,23 +2,22 @@ import { Router } from "express";
 import { authAccess } from "../middlewares";
 import {
   sendRequest,
-  rejectRequest,
-  acceptRequest,
-  // pendingRequests,
-  // unfriendUser,
+  handleRequest,
+  retrieveRequest,
+  pendingRequests,
+  unfriendUser,
   fetchFriends,
 } from "../controllers/friend";
 
 const router = Router();
 
-router.post("/request/send", authAccess, sendRequest);
+router.post("/request-send", authAccess, sendRequest);
+router.patch("/request-handle", authAccess, handleRequest);
 
-router.patch("/request/reject", authAccess, rejectRequest);
-router.patch("/request/accept", authAccess, acceptRequest);
+router.delete("/request-retrieve", authAccess, retrieveRequest);
+router.delete("/unfriend", authAccess, unfriendUser);
 
-// router.patch("/unfriend", authAccess, unfriendUser);
-
-// router.get("/request/pending", authAccess, pendingRequests);
+router.get("/request-pending", authAccess, pendingRequests);
 router.get("/fetch", authAccess, fetchFriends);
 
 export default router;
