@@ -42,23 +42,11 @@ const authAccess = (req, res, next) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.authAccess = authAccess;
-const deleteToken = (res, userId, authorizeId, refreshToken) => __awaiter(void 0, void 0, void 0, function* () {
-    const deleteResponse = yield user_1.default.findOneAndUpdate({ _id: userId }, {
-        $pull: {
-            authentication: { _id: authorizeId, token: refreshToken },
-        },
-    }, { new: true });
-    if (deleteResponse) {
-        res.clearCookie("access");
-        res.clearCookie("refresh");
-        res.clearCookie("session");
-    }
-});
 const authRefresh = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const refreshToken = req.cookies.refresh;
         const authorizeId = req.cookies.session;
-        if (!refreshToken) {
+        if (!refreshToken || authorizeId) {
             throw new utils_1.ApiError(401, "Unauthorized refresh request!");
         }
         let decodedPayload;
@@ -94,7 +82,7 @@ const authRefresh = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
         if (currentTime >= beforeExpires && currentTime < decodedPayload.exp) {
             const newRefreshToken = (0, helpers_1.generateRefresh)(res, userId);
             const refreshExpiry = env_1.default.REFRESH_EXPIRY;
-            const updatedAuth = yield user_1.default.findOneAndUpdate({
+            const updatedAuth = yield user_1.default.updateOne({
                 _id: userId,
                 authentication: {
                     $elemMatch: { _id: authorizeId, token: refreshToken },
@@ -104,8 +92,8 @@ const authRefresh = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
                     "authentication.$.token": newRefreshToken,
                     "authentication.$.expiry": new Date(Date.now() + refreshExpiry * 1000),
                 },
-            }, { new: true });
-            if (updatedAuth) {
+            });
+            if (updatedAuth.modifiedCount > 0) {
                 (0, helpers_1.authorizeCookie)(res, authorizeId);
                 const accessToken = (0, helpers_1.generateAccess)(res, accessData);
                 authTokens.access = accessToken;
@@ -116,14 +104,21 @@ const authRefresh = (req, res, next) => __awaiter(void 0, void 0, void 0, functi
             }
         }
         else if (currentTime >= decodedPayload.exp) {
-            yield deleteToken(res, requestUser._id, authorizeId, refreshToken);
+            yield user_1.default.updateOne({ _id: userId }, {
+                $pull: {
+                    authentication: { _id: authorizeId, token: refreshToken },
+                },
+            });
+            res.clearCookie("access");
+            res.clearCookie("refresh");
+            res.clearCookie("session");
             throw new utils_1.ApiError(401, "Please, login again to continue!");
         }
         else {
             const accessToken = (0, helpers_1.generateAccess)(res, accessData);
             authTokens.access = accessToken;
         }
-        req.user = requestUser;
+        req.user = accessData;
         req.token = authTokens;
         next();
     }

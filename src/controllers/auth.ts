@@ -105,14 +105,13 @@ const signOutUser = async (req: Request, res: Response) => {
   const authorizeId = req.cookies.session;
 
   if (requestUser.setup && refreshToken && authorizeId) {
-    await User.findOneAndUpdate(
+    await User.updateOne(
       { _id: requestUser._id },
       {
         $pull: {
           authentication: { _id: authorizeId, token: refreshToken },
         },
-      },
-      { new: true }
+      }
     );
   }
 
@@ -126,7 +125,7 @@ const signOutUser = async (req: Request, res: Response) => {
 
 const refreshAuth = async (req: Request, res: Response) => {
   const refreshData = { user: req.user, token: req.token };
-  return ApiResponse(res, 200, "Authentication refreshed!", refreshData);
+  return ApiResponse(res, 200, "Authentication refreshed!");
 };
 
 export { signUpUser, signInUser, signOutUser, refreshAuth };

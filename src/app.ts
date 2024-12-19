@@ -50,12 +50,12 @@ if (env.isDev) {
 app.use("/api", ApiRouters);
 
 app.all("*path", (_req: Request, res: Response) => {
-  res.status(200).send({ message: "Hello, from Express via Vercel!" });
+  res.status(200).json({ message: "Hello, from Express via Vercel!" });
 });
 
 app.use(((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error(`Error: ${err.message}`);
-  res.status(500).json({ message: "Internal server error!" });
+  res.status(500).json({ message: "Internal Server Error!" });
 }) as ErrorRequestHandler);
 
 export default app;

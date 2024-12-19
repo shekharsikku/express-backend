@@ -94,11 +94,11 @@ const signOutUser = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     const refreshToken = req.cookies.refresh;
     const authorizeId = req.cookies.session;
     if (requestUser.setup && refreshToken && authorizeId) {
-        yield user_1.default.findOneAndUpdate({ _id: requestUser._id }, {
+        yield user_1.default.updateOne({ _id: requestUser._id }, {
             $pull: {
                 authentication: { _id: authorizeId, token: refreshToken },
             },
-        }, { new: true });
+        });
     }
     res.clearCookie("access");
     res.clearCookie("refresh");
@@ -109,6 +109,6 @@ const signOutUser = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.signOutUser = signOutUser;
 const refreshAuth = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const refreshData = { user: req.user, token: req.token };
-    return (0, utils_1.ApiResponse)(res, 200, "Authentication refreshed!", refreshData);
+    return (0, utils_1.ApiResponse)(res, 200, "Authentication refreshed!");
 });
 exports.refreshAuth = refreshAuth;

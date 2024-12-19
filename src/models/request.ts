@@ -15,7 +15,7 @@ const RequestsSchema = new Schema<RequestsInterface>(
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
+      enum: ["pending", "accepted", "rejected", "retrieved"],
       default: "pending",
     },
   },

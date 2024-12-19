@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { ApiError, ApiResponse } from "../utils";
-import { DetailInterface } from "../interface";
 import {
   hasEmptyField,
   removeSpaces,
@@ -10,6 +9,7 @@ import {
   createAccessData,
   generateAccess,
 } from "../helpers";
+import { DetailInterface } from "../interface";
 import User from "../models/user";
 
 const profileSetup = async (req: Request, res: Response) => {
@@ -69,7 +69,9 @@ const changePassword = async (req: Request, res: Response) => {
   try {
     const { old_password, new_password } = await req.body;
 
-    const requestUser = await User.findById(req.user?._id).select("+password -friends");
+    const requestUser = await User.findById(req.user?._id).select(
+      "+password -friends"
+    );
 
     if (!requestUser) {
       throw new ApiError(403, "Invalid authorization!");

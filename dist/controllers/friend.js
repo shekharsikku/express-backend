@@ -32,20 +32,33 @@ const sendRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!exists) {
             throw new utils_1.ApiError(404, "Recipient does not exist!");
         }
+        if (exists.friends.includes(requester)) {
+            throw new utils_1.ApiError(400, "You both are already friends!");
+        }
         const existing = yield request_1.default.findOne({
             requester,
             recipient,
-            status: { $in: ["pending", "accepted", "rejected"] },
+            status: { $in: ["pending", "accepted", "rejected", "retrieved"] },
         });
         if (existing) {
+            let message = "";
             switch (existing.status) {
                 case "pending":
-                    throw new utils_1.ApiError(400, "Friend request already sent!");
+                    message = "Friend request already sent!";
+                    break;
                 case "accepted":
-                    throw new utils_1.ApiError(400, "You both are already friends!");
+                    message = "You both are already friends!";
+                    break;
                 case "rejected":
-                    throw new utils_1.ApiError(403, "You can't able to send request!");
+                    message = "You are unable to send request!";
+                    break;
+                case "retrieved":
+                    message = "You can send request after few days!";
+                    break;
+                default:
+                    message = "Unable to send request currently!";
             }
+            throw new utils_1.ApiError(400, message);
         }
         yield request_1.default.create({ requester, recipient });
         return (0, utils_1.ApiResponse)(res, 200, "Friend request sent successfully!");
@@ -73,7 +86,7 @@ const handleRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             status: "pending",
         });
         if (!request) {
-            throw new utils_1.ApiError(404, "Friend request not found");
+            throw new utils_1.ApiError(404, "Friend request not found!");
         }
         if (action === "accept") {
             request.status = "accepted";
@@ -103,10 +116,12 @@ const retrieveRequest = (req, res) => __awaiter(void 0, void 0, void 0, function
     try {
         const requester = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         const recipient = req.query.from;
-        const response = yield request_1.default.findOneAndDelete({
+        const response = yield request_1.default.findOneAndUpdate({
             requester,
             recipient,
             status: "pending",
+        }, {
+            status: "retrieved",
         });
         if (response) {
             return (0, utils_1.ApiResponse)(res, 200, "Friend request retrieved!");
@@ -242,13 +257,30 @@ const unfriendUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             !friend.friends.includes(user._id)) {
             throw new utils_1.ApiError(400, "You are not friend with this user!");
         }
-        yield user_1.default.findByIdAndUpdate(user, {
-            $pull: { friends: friend },
+        const current = yield user_1.default.findByIdAndUpdate(user._id, {
+            $pull: { friends: friend._id },
         });
-        yield user_1.default.findByIdAndUpdate(friend, {
-            $pull: { friends: user },
+        const other = yield user_1.default.findByIdAndUpdate(friend._id, {
+            $pull: { friends: user._id },
         });
-        return (0, utils_1.ApiResponse)(res, 200, "Friend removed successfully!");
+        if (current && other) {
+            const result = yield request_1.default.deleteOne({
+                status: "accepted",
+                $or: [
+                    { requester: user._id, recipient: friend._id },
+                    { requester: friend._id, recipient: user._id },
+                ],
+            });
+            let message = "";
+            if (result.deletedCount > 0) {
+                message = "Friend removed successfully!";
+            }
+            else {
+                message = "No matching friendship found!";
+            }
+            return (0, utils_1.ApiResponse)(res, 200, message);
+        }
+        throw new utils_1.ApiError(400, "Error while removing user from friend!");
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);

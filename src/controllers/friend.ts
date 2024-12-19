@@ -23,21 +23,37 @@ const sendRequest = async (req: Request, res: Response) => {
       throw new ApiError(404, "Recipient does not exist!");
     }
 
+    if (exists.friends.includes(requester!)) {
+      throw new ApiError(400, "You both are already friends!");
+    }
+
     const existing = await Requests.findOne({
       requester,
       recipient,
-      status: { $in: ["pending", "accepted", "rejected"] },
+      status: { $in: ["pending", "accepted", "rejected", "retrieved"] },
     });
 
     if (existing) {
+      let message = "";
+
       switch (existing.status) {
         case "pending":
-          throw new ApiError(400, "Friend request already sent!");
+          message = "Friend request already sent!";
+          break;
         case "accepted":
-          throw new ApiError(400, "You both are already friends!");
+          message = "You both are already friends!";
+          break;
         case "rejected":
-          throw new ApiError(403, "You can't able to send request!");
+          message = "You are unable to send request!";
+          break;
+        case "retrieved":
+          message = "You can send request after few days!";
+          break;
+        default:
+          message = "Unable to send request currently!";
       }
+
+      throw new ApiError(400, message);
     }
 
     await Requests.create({ requester, recipient });
@@ -71,7 +87,7 @@ const handleRequest = async (req: Request, res: Response) => {
     });
 
     if (!request) {
-      throw new ApiError(404, "Friend request not found");
+      throw new ApiError(404, "Friend request not found!");
     }
 
     if (action === "accept") {
@@ -105,11 +121,16 @@ const retrieveRequest = async (req: Request, res: Response) => {
     const requester = req.user?._id;
     const recipient = req.query.from as string;
 
-    const response = await Requests.findOneAndDelete({
-      requester,
-      recipient,
-      status: "pending",
-    });
+    const response = await Requests.findOneAndUpdate(
+      {
+        requester,
+        recipient,
+        status: "pending",
+      },
+      {
+        status: "retrieved",
+      }
+    );
 
     if (response) {
       return ApiResponse(res, 200, "Friend request retrieved!");
@@ -252,15 +273,35 @@ const unfriendUser = async (req: Request, res: Response) => {
       throw new ApiError(400, "You are not friend with this user!");
     }
 
-    await User.findByIdAndUpdate(user, {
-      $pull: { friends: friend },
+    const current = await User.findByIdAndUpdate(user._id, {
+      $pull: { friends: friend._id },
     });
 
-    await User.findByIdAndUpdate(friend, {
-      $pull: { friends: user },
+    const other = await User.findByIdAndUpdate(friend._id, {
+      $pull: { friends: user._id },
     });
 
-    return ApiResponse(res, 200, "Friend removed successfully!");
+    if (current && other) {
+      const result = await Requests.deleteOne({
+        status: "accepted",
+        $or: [
+          { requester: user._id, recipient: friend._id },
+          { requester: friend._id, recipient: user._id },
+        ],
+      });
+
+      let message = "";
+
+      if (result.deletedCount > 0) {
+        message = "Friend removed successfully!";
+      } else {
+        message = "No matching friendship found!";
+      }
+
+      return ApiResponse(res, 200, message);
+    }
+
+    throw new ApiError(400, "Error while removing user from friend!");
   } catch (error: any) {
     return ApiResponse(res, error.code, error.message);
   }

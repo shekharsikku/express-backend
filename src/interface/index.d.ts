@@ -22,7 +22,7 @@ interface UserInterface extends Document {
 interface RequestsInterface extends Document {
   requester: Types.ObjectId;
   recipient: Types.ObjectId;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "retrieved";
 }
 
 interface TokenInterface {

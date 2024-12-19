@@ -43,29 +43,6 @@ const authAccess = async (
   }
 };
 
-const deleteToken = async (
-  res: Response,
-  userId: Types.ObjectId,
-  authorizeId: string,
-  refreshToken: string
-) => {
-  const deleteResponse = await User.findOneAndUpdate(
-    { _id: userId },
-    {
-      $pull: {
-        authentication: { _id: authorizeId, token: refreshToken },
-      },
-    },
-    { new: true }
-  );
-
-  if (deleteResponse) {
-    res.clearCookie("access");
-    res.clearCookie("refresh");
-    res.clearCookie("session");
-  }
-};
-
 const authRefresh = async (
   req: Request,
   res: Response,
@@ -75,7 +52,7 @@ const authRefresh = async (
     const refreshToken = req.cookies.refresh;
     const authorizeId = req.cookies.session;
 
-    if (!refreshToken) {
+    if (!refreshToken || authorizeId) {
       throw new ApiError(401, "Unauthorized refresh request!");
     }
 
@@ -118,7 +95,7 @@ const authRefresh = async (
       const newRefreshToken = generateRefresh(res, userId);
       const refreshExpiry = env.REFRESH_EXPIRY;
 
-      const updatedAuth = await User.findOneAndUpdate(
+      const updatedAuth = await User.updateOne(
         {
           _id: userId,
           authentication: {
@@ -132,11 +109,10 @@ const authRefresh = async (
               Date.now() + refreshExpiry * 1000
             ),
           },
-        },
-        { new: true }
+        }
       );
 
-      if (updatedAuth) {
+      if (updatedAuth.modifiedCount > 0) {
         authorizeCookie(res, authorizeId!);
         const accessToken = generateAccess(res, accessData);
         authTokens.access = accessToken;
@@ -145,14 +121,26 @@ const authRefresh = async (
         throw new ApiError(403, "Invalid refresh request!");
       }
     } else if (currentTime >= decodedPayload.exp!) {
-      await deleteToken(res, requestUser._id, authorizeId, refreshToken);
+      await User.updateOne(
+        { _id: userId },
+        {
+          $pull: {
+            authentication: { _id: authorizeId, token: refreshToken },
+          },
+        }
+      );
+
+      res.clearCookie("access");
+      res.clearCookie("refresh");
+      res.clearCookie("session");
+
       throw new ApiError(401, "Please, login again to continue!");
     } else {
       const accessToken = generateAccess(res, accessData);
       authTokens.access = accessToken;
     }
 
-    req.user = requestUser;
+    req.user = accessData;
     req.token = authTokens;
     next();
   } catch (error: any) {

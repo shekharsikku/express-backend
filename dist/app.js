@@ -35,10 +35,10 @@ else {
 }
 app.use("/api", routers_1.default);
 app.all("*path", (_req, res) => {
-    res.status(200).send({ message: "Hello, from Express via Vercel!" });
+    res.status(200).json({ message: "Hello, from Express via Vercel!" });
 });
 app.use(((err, _req, res, _next) => {
     console.error(`Error: ${err.message}`);
-    res.status(500).json({ message: "Internal server error!" });
+    res.status(500).json({ message: "Internal Server Error!" });
 }));
 exports.default = app;
