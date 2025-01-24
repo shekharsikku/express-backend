@@ -8,7 +8,6 @@ import {
   authorizeCookie,
   maskedDetails,
   createAccessData,
-  publicIpAddress,
 } from "../helpers";
 import User from "../models/user";
 import env from "../utils/env";
@@ -17,13 +16,14 @@ const signUpUser = async (req: Request, res: Response) => {
   try {
     const { email, password } = await req.body;
 
-    const existsEmail = await User.findOne({ email });
+    const [existsEmail, hashedPassword] = await Promise.all([
+      User.findOne({ email }),
+      generateHash(password),
+    ]);
 
     if (existsEmail) {
       throw new ApiError(409, "Email already exists!");
     }
-
-    const hashedPassword = await generateHash(password);
 
     const newUser = await User.create({
       email,
@@ -74,12 +74,10 @@ const signInUser = async (req: Request, res: Response) => {
 
     const refreshToken = generateRefresh(res, accessData._id!);
     const refreshExpiry = env.REFRESH_EXPIRY;
-    const ipAddress = await publicIpAddress();
 
     existsUser.authentication?.push({
       token: refreshToken,
       expiry: new Date(Date.now() + refreshExpiry * 1000),
-      device: ipAddress.ip,
     });
 
     const authorizeUser = await existsUser.save();

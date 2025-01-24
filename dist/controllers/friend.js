@@ -36,8 +36,10 @@ const sendRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             throw new utils_1.ApiError(400, "You both are already friends!");
         }
         const existing = yield request_1.default.findOne({
-            requester,
-            recipient,
+            $or: [
+                { requester: requester, recipient: recipient },
+                { requester: recipient, recipient: requester },
+            ],
             status: { $in: ["pending", "accepted", "rejected", "retrieved"] },
         });
         if (existing) {
@@ -116,14 +118,14 @@ const retrieveRequest = (req, res) => __awaiter(void 0, void 0, void 0, function
     try {
         const requester = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         const recipient = req.query.from;
-        const response = yield request_1.default.findOneAndUpdate({
+        const response = yield request_1.default.updateOne({
             requester,
             recipient,
             status: "pending",
         }, {
             status: "retrieved",
         });
-        if (response) {
+        if (response.modifiedCount > 0) {
             return (0, utils_1.ApiResponse)(res, 200, "Friend request retrieved!");
         }
         throw new utils_1.ApiError(400, "No request found to retrieve!");

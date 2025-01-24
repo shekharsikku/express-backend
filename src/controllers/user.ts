@@ -69,9 +69,10 @@ const changePassword = async (req: Request, res: Response) => {
   try {
     const { old_password, new_password } = await req.body;
 
-    const requestUser = await User.findById(req.user?._id).select(
-      "+password -friends"
-    );
+    const [requestUser, hashedPassword] = await Promise.all([
+      User.findById(req.user?._id).select("+password -friends"),
+      generateHash(new_password),
+    ]);
 
     if (!requestUser) {
       throw new ApiError(403, "Invalid authorization!");
@@ -89,8 +90,6 @@ const changePassword = async (req: Request, res: Response) => {
     if (!validatePassword) {
       throw new ApiError(403, "Incorrect old password!");
     }
-
-    const hashedPassword = await generateHash(new_password);
 
     requestUser.password = hashedPassword;
     await requestUser.save({ validateBeforeSave: true });
@@ -118,4 +117,35 @@ const userInformation = async (req: Request, res: Response) => {
   }
 };
 
-export { profileSetup, changePassword, userInformation };
+const searchUsers = async (req: Request, res: Response) => {
+  try {
+    const search = req.query.search as string;
+
+    if (!search) {
+      throw new ApiError(400, "Search query is required!");
+    }
+
+    const terms = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(terms, "i");
+
+    const result = await User.find({
+      $and: [
+        { _id: { $ne: req.user?._id } },
+        { setup: true },
+        { $or: [{ name: regex }, { username: regex }, { email: regex }] },
+      ],
+    })
+      .select("-friends")
+      .lean();
+
+    if (result.length == 0) {
+      throw new ApiError(404, "No any user found!");
+    }
+
+    return ApiResponse(res, 200, "Available contacts!", result);
+  } catch (error: any) {
+    return ApiResponse(res, error.code, error.message);
+  }
+};
+
+export { profileSetup, changePassword, userInformation, searchUsers };

@@ -20,11 +20,13 @@ const env_1 = __importDefault(require("../utils/env"));
 const signUpUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = yield req.body;
-        const existsEmail = yield user_1.default.findOne({ email });
+        const [existsEmail, hashedPassword] = yield Promise.all([
+            user_1.default.findOne({ email }),
+            (0, helpers_1.generateHash)(password),
+        ]);
         if (existsEmail) {
             throw new utils_1.ApiError(409, "Email already exists!");
         }
-        const hashedPassword = yield (0, helpers_1.generateHash)(password);
         const newUser = yield user_1.default.create({
             email,
             password: hashedPassword,
@@ -69,11 +71,9 @@ const signInUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         }
         const refreshToken = (0, helpers_1.generateRefresh)(res, accessData._id);
         const refreshExpiry = env_1.default.REFRESH_EXPIRY;
-        const ipAddress = yield (0, helpers_1.publicIpAddress)();
         (_a = existsUser.authentication) === null || _a === void 0 ? void 0 : _a.push({
             token: refreshToken,
             expiry: new Date(Date.now() + refreshExpiry * 1000),
-            device: ipAddress.ip,
         });
         const authorizeUser = yield existsUser.save();
         const authorizeId = (_b = authorizeUser.authentication) === null || _b === void 0 ? void 0 : _b.filter((auth) => auth.token === refreshToken)[0]._id;

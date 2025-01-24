@@ -28,8 +28,10 @@ const sendRequest = async (req: Request, res: Response) => {
     }
 
     const existing = await Requests.findOne({
-      requester,
-      recipient,
+      $or: [
+        { requester: requester, recipient: recipient },
+        { requester: recipient, recipient: requester },
+      ],
       status: { $in: ["pending", "accepted", "rejected", "retrieved"] },
     });
 
@@ -121,7 +123,7 @@ const retrieveRequest = async (req: Request, res: Response) => {
     const requester = req.user?._id;
     const recipient = req.query.from as string;
 
-    const response = await Requests.findOneAndUpdate(
+    const response = await Requests.updateOne(
       {
         requester,
         recipient,
@@ -132,7 +134,7 @@ const retrieveRequest = async (req: Request, res: Response) => {
       }
     );
 
-    if (response) {
+    if (response.modifiedCount > 0) {
       return ApiResponse(res, 200, "Friend request retrieved!");
     }
 

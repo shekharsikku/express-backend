@@ -5,6 +5,7 @@ import {
   profileSetup,
   changePassword,
   userInformation,
+  searchUsers,
 } from "../controllers/user";
 
 const router = Router();
@@ -24,5 +25,6 @@ router.patch(
 );
 
 router.get("/user-information", authAccess, userInformation);
+router.get("/search-users", authAccess, searchUsers);
 
 export default router;

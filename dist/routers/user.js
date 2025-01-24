@@ -8,4 +8,5 @@ const router = (0, express_1.Router)();
 router.patch("/profile-setup", middlewares_1.authAccess, (0, schema_1.validateSchema)(schema_1.profileSchema), user_1.profileSetup);
 router.patch("/change-password", middlewares_1.authAccess, (0, schema_1.validateSchema)(schema_1.passwordSchema), user_1.changePassword);
 router.get("/user-information", middlewares_1.authAccess, user_1.userInformation);
+router.get("/search-users", middlewares_1.authAccess, user_1.searchUsers);
 exports.default = router;

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.userInformation = exports.changePassword = exports.profileSetup = void 0;
+exports.searchUsers = exports.userInformation = exports.changePassword = exports.profileSetup = void 0;
 const utils_1 = require("../utils");
 const helpers_1 = require("../helpers");
 const user_1 = __importDefault(require("../models/user"));
@@ -62,7 +62,10 @@ const changePassword = (req, res) => __awaiter(void 0, void 0, void 0, function*
     var _a;
     try {
         const { old_password, new_password } = yield req.body;
-        const requestUser = yield user_1.default.findById((_a = req.user) === null || _a === void 0 ? void 0 : _a._id).select("+password -friends");
+        const [requestUser, hashedPassword] = yield Promise.all([
+            user_1.default.findById((_a = req.user) === null || _a === void 0 ? void 0 : _a._id).select("+password -friends"),
+            (0, helpers_1.generateHash)(new_password),
+        ]);
         if (!requestUser) {
             throw new utils_1.ApiError(403, "Invalid authorization!");
         }
@@ -73,7 +76,6 @@ const changePassword = (req, res) => __awaiter(void 0, void 0, void 0, function*
         if (!validatePassword) {
             throw new utils_1.ApiError(403, "Incorrect old password!");
         }
-        const hashedPassword = yield (0, helpers_1.generateHash)(new_password);
         requestUser.password = hashedPassword;
         yield requestUser.save({ validateBeforeSave: true });
         const accessData = (0, helpers_1.createAccessData)(requestUser);
@@ -99,3 +101,31 @@ const userInformation = (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 });
 exports.userInformation = userInformation;
+const searchUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const search = req.query.search;
+        if (!search) {
+            throw new utils_1.ApiError(400, "Search query is required!");
+        }
+        const terms = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(terms, "i");
+        const result = yield user_1.default.find({
+            $and: [
+                { _id: { $ne: (_a = req.user) === null || _a === void 0 ? void 0 : _a._id } },
+                { setup: true },
+                { $or: [{ name: regex }, { username: regex }, { email: regex }] },
+            ],
+        })
+            .select("-friends")
+            .lean();
+        if (result.length == 0) {
+            throw new utils_1.ApiError(404, "No any user found!");
+        }
+        return (0, utils_1.ApiResponse)(res, 200, "Available contacts!", result);
+    }
+    catch (error) {
+        return (0, utils_1.ApiResponse)(res, error.code, error.message);
+    }
+});
+exports.searchUsers = searchUsers;
