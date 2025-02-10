@@ -25,4 +25,13 @@ const getData = async (uid: Types.ObjectId) => {
   }
 };
 
-export { setData, getData };
+const delData = async (uid: Types.ObjectId) => {
+  try {
+    const key = `user:${uid}`;
+    return await redis?.del(key);
+  } catch (error: any) {
+    return null;
+  }
+};
+
+export { setData, getData, delData };

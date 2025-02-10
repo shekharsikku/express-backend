@@ -41,16 +41,11 @@ const UserSchema = new Schema<UserInterface>(
       type: Boolean,
       default: false,
     },
-    friends: [{ type: Schema.Types.ObjectId, ref: "User" }],
     authentication: {
       type: [
         {
           token: String,
           expiry: Date,
-          device: {
-            type: String,
-            default: null,
-          },
         },
       ],
       select: false,

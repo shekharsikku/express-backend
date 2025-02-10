@@ -7,7 +7,7 @@ import {
   authorizeCookie,
   createUserInfo,
 } from "../helpers";
-import { setData } from "../utils/redis";
+import { setData, delData } from "../utils/redis";
 import User from "../models/user";
 import env from "../utils/env";
 
@@ -104,6 +104,7 @@ const signOutUser = async (req: Request, res: Response) => {
     );
   }
 
+  await delData(requestUser._id!);
   res.clearCookie("access");
   res.clearCookie("refresh");
   res.clearCookie("session");
