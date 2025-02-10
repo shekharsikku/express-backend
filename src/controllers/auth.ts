@@ -7,6 +7,7 @@ import {
   authorizeCookie,
   createUserInfo,
 } from "../helpers";
+import { setData } from "../utils/redis";
 import User from "../models/user";
 import env from "../utils/env";
 
@@ -60,6 +61,7 @@ const signInUser = async (req: Request, res: Response) => {
 
     const userInfo = createUserInfo(existsUser);
     generateAccess(res, userInfo._id!);
+    await setData(userInfo);
 
     if (!userInfo.setup) {
       return ApiResponse(res, 200, "Please, complete your profile!", userInfo);

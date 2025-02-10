@@ -10,19 +10,11 @@ interface UserInterface extends Document {
   image?: string;
   bio?: string;
   setup?: boolean;
-  friends: Types.ObjectId[];
   authentication?: {
     _id?: Types.ObjectId;
     token: string;
     expiry: Date;
-    device?: string;
   }[];
-}
-
-interface RequestsInterface extends Document {
-  requester: Types.ObjectId;
-  recipient: Types.ObjectId;
-  status: "pending" | "accepted" | "rejected" | "retrieved";
 }
 
 interface TokenInterface {
@@ -30,10 +22,8 @@ interface TokenInterface {
   refresh?: string;
 }
 
-interface DetailInterface {
-  name?: string;
-  username?: string;
-  gender?: "Male" | "Female" | "Other";
-  bio?: string;
-  setup?: boolean;
+interface RequestsInterface extends Document {
+  requester: Types.ObjectId;
+  recipient: Types.ObjectId;
+  status: "pending" | "accepted" | "rejected" | "retrieved";
 }
