@@ -22,8 +22,9 @@ interface TokenInterface {
   refresh?: string;
 }
 
-interface RequestsInterface extends Document {
+interface FriendInterface extends Document {
   requester: Types.ObjectId;
   recipient: Types.ObjectId;
-  status: "pending" | "accepted" | "rejected" | "retrieved";
+  status: "pending" | "accepted" | "rejected" | "canceled" | "blocked";
+  lastActionAt: Date;
 }
