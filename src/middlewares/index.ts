@@ -1,11 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 import { ApiError, ApiResponse } from "../utils";
-import { UserInterface, TokenInterface } from "../interface";
+import { setData, getData } from "../utils/redis";
 import { Types } from "mongoose";
 import {
   generateAccess,
   generateRefresh,
-  createAccessData,
+  createUserInfo,
   authorizeCookie,
 } from "../helpers";
 import jwt, { JwtPayload } from "jsonwebtoken";
@@ -35,7 +35,18 @@ const authAccess = async (
       throw new ApiError(403, "Invalid access request!");
     }
 
-    req.user = decodedPayload.user as UserInterface;
+    let userData = await getData(decodedPayload.uid);
+
+    if (userData) {
+      req.user = userData;
+      return next();
+    }
+
+    userData = await User.findById(decodedPayload.uid);
+    const userInfo = createUserInfo(userData!);
+
+    await setData(userInfo);
+    req.user = userInfo;
     next();
   } catch (error: any) {
     return ApiResponse(res, error.code, error.message);
@@ -51,7 +62,7 @@ const authRefresh = async (
     const refreshToken = req.cookies.refresh;
     const authorizeId = req.cookies.session;
 
-    if (!refreshToken || authorizeId) {
+    if (!refreshToken || !authorizeId) {
       throw new ApiError(401, "Unauthorized refresh request!");
     }
 
@@ -85,8 +96,7 @@ const authRefresh = async (
       throw new ApiError(403, "Invalid user request!");
     }
 
-    let authTokens: TokenInterface = {};
-    const accessData = createAccessData(requestUser);
+    const userInfo = createUserInfo(requestUser);
 
     if (currentTime >= beforeExpires && currentTime < decodedPayload.exp!) {
       const newRefreshToken = generateRefresh(res, userId);
@@ -111,9 +121,7 @@ const authRefresh = async (
 
       if (updatedAuth.modifiedCount > 0) {
         authorizeCookie(res, authorizeId!);
-        const accessToken = generateAccess(res, accessData);
-        authTokens.access = accessToken;
-        authTokens.refresh = newRefreshToken;
+        generateAccess(res, userId);
       } else {
         throw new ApiError(403, "Invalid refresh request!");
       }
@@ -133,12 +141,11 @@ const authRefresh = async (
 
       throw new ApiError(401, "Please, login again to continue!");
     } else {
-      const accessToken = generateAccess(res, accessData);
-      authTokens.access = accessToken;
+      generateAccess(res, userId);
     }
 
-    req.user = accessData;
-    req.token = authTokens;
+    await setData(userInfo);
+    req.user = userInfo;
     next();
   } catch (error: any) {
     return ApiResponse(res, error.code, error.message);
