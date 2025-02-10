@@ -16,5 +16,4 @@ node_modules
 *.txt
 
 # other dir
-configs
-redis
+test

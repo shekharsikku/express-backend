@@ -8,5 +8,5 @@
   ],
   "ext": ".ts, .js, .json",
   "exec": "ts-node src/index.ts",
-  "delay": 500
+  "delay": 1000
 }
