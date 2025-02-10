@@ -20,10 +20,6 @@ const FriendSchema = new Schema<FriendInterface>(
       enum: ["pending", "accepted", "rejected", "canceled", "blocked"],
       default: "pending",
     },
-    lastActionAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
     timestamps: true,

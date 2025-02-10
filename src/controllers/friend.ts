@@ -1,7 +1,7 @@
 import { ApiError, ApiResponse } from "../utils";
 import { Request, Response } from "express";
 import { Types } from "mongoose";
-import Requests from "../models/request";
+import Friend from "../models/friend";
 import User from "../models/user";
 
 const sendRequest = async (req: Request, res: Response) => {
@@ -17,48 +17,56 @@ const sendRequest = async (req: Request, res: Response) => {
       throw new ApiError(400, "You cannot send a request to yourself!");
     }
 
-    const exists = await User.findById(recipient);
+    const recipientExists = await User.exists({ _id: recipient });
 
-    if (!exists) {
+    if (!recipientExists) {
       throw new ApiError(404, "Recipient does not exist!");
     }
 
-    if (exists.friends.includes(requester!)) {
-      throw new ApiError(400, "You both are already friends!");
-    }
-
-    const existing = await Requests.findOne({
+    const existingRequest = await Friend.findOne({
       $or: [
         { requester: requester, recipient: recipient },
         { requester: recipient, recipient: requester },
       ],
-      status: { $in: ["pending", "accepted", "rejected", "retrieved"] },
+      status: {
+        $in: ["pending", "accepted", "rejected", "canceled", "blocked"],
+      },
     });
 
-    if (existing) {
-      let message = "";
+    if (existingRequest) {
+      const cooldownTime = 7 * 24 * 60 * 60 * 1000;
+      const createdAtTime =
+        Date.now() - new Date(existingRequest.createdAt!).getTime();
 
-      switch (existing.status) {
-        case "pending":
-          message = "Friend request already sent!";
-          break;
-        case "accepted":
-          message = "You both are already friends!";
-          break;
-        case "rejected":
-          message = "You are unable to send request!";
-          break;
-        case "retrieved":
-          message = "You can send request after few days!";
-          break;
-        default:
-          message = "Unable to send request currently!";
+      if (existingRequest.status === "pending") {
+        throw new ApiError(400, "Friend request already sent!");
       }
 
-      throw new ApiError(400, message);
+      if (existingRequest.status === "accepted") {
+        throw new ApiError(400, "You both are already friends!");
+      }
+
+      if (["rejected", "canceled"].includes(existingRequest.status)) {
+        if (createdAtTime < cooldownTime) {
+          const remainingDays = Math.ceil(
+            (cooldownTime - createdAtTime) / (1000 * 60 * 60 * 24)
+          );
+          throw new ApiError(
+            400,
+            `You can send a new request after ${remainingDays} days!`
+          );
+        }
+      }
+
+      if (existingRequest.status === "blocked") {
+        throw new ApiError(
+          400,
+          "You cannot send a request. User has blocked you!"
+        );
+      }
     }
 
-    await Requests.create({ requester, recipient });
+    await Friend.create({ requester, recipient });
 
     /** handle a request notification here in via socket.io */
 
@@ -75,49 +83,30 @@ const handleRequest = async (req: Request, res: Response) => {
     const action = req.query.action as string;
 
     if (!requester) {
-      throw new ApiError(400, "Requester required for reject request!");
+      throw new ApiError(400, "Requester required for handle request!");
     }
 
     if (!["accept", "reject"].includes(action)) {
       throw new ApiError(400, "Action must be either 'accept' or 'reject'!");
     }
 
-    const request = await Requests.findOne({
-      requester,
-      recipient,
-      status: "pending",
-    });
+    const updatedResult = await Friend.updateOne(
+      { requester, recipient, status: "pending" },
+      { $set: { status: action === "accept" ? "accepted" : "rejected" } }
+    );
 
-    if (!request) {
-      throw new ApiError(404, "Friend request not found!");
+    if (updatedResult.matchedCount === 0) {
+      throw new ApiError(404, "Friend request not found or already processed!");
     }
 
-    if (action === "accept") {
-      request.status = "accepted";
-      await request.save();
-
-      await User.findByIdAndUpdate(recipient, {
-        $addToSet: { friends: requester },
-      });
-
-      await User.findByIdAndUpdate(requester, {
-        $addToSet: { friends: recipient },
-      });
-
-      return ApiResponse(res, 200, "Friend request accepted!");
-    } else if (action === "reject") {
-      request.status = "rejected";
-      await request.save();
-
-      return ApiResponse(res, 200, "Friend request rejected!");
-    }
-
-    throw new ApiError(400, "Error occurred while handling request!");
+    return ApiResponse(res, 200, `Friend request ${action}ed successfully!`);
   } catch (error: any) {
     return ApiResponse(res, error.code, error.message);
   }
 };
 
+
+/*
 const retrieveRequest = async (req: Request, res: Response) => {
   try {
     const requester = req.user?._id;
@@ -328,12 +317,12 @@ const fetchFriends = async (req: Request, res: Response) => {
     return ApiResponse(res, error.code, error.message);
   }
 };
-
+*/
 export {
   sendRequest,
   handleRequest,
-  retrieveRequest,
-  pendingRequests,
-  unfriendUser,
-  fetchFriends,
+  // retrieveRequest,
+  // pendingRequests,
+  // unfriendUser,
+  // fetchFriends,
 };

@@ -23,8 +23,10 @@ interface TokenInterface {
 }
 
 interface FriendInterface extends Document {
+  _id?: Types.ObjectId;
   requester: Types.ObjectId;
   recipient: Types.ObjectId;
   status: "pending" | "accepted" | "rejected" | "canceled" | "blocked";
-  lastActionAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
