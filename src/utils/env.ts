@@ -1,18 +1,9 @@
 import dotenv from "dotenv";
-import { cleanEnv, email, port, url, str, num } from "envalid";
+import { cleanEnv, str, url, num, port } from "envalid";
 
 dotenv.config();
 
 const env = cleanEnv(process.env, {
-  MAILTRAP_TOKEN: str(),
-  MAILTRAP_ENDPOINT: url(),
-  MAILTRAP_EMAIL: email(),
-  IPIFY_ADDRESS_URL: url(),
-
-  IMAGEKIT_PUBLIC_KEY: str(),
-  IMAGEKIT_PRIVATE_KEY: str(),
-  IMAGEKIT_URL_ENDPOINT: url(),
-
   ACCESS_SECRET: str(),
   ACCESS_EXPIRY: num(),
 
