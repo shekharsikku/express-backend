@@ -2,12 +2,11 @@ import { mongodb } from "./database";
 import env from "./utils/env";
 import app from "./app";
 
-const uri = env.MONGODB_URI;
 const port = env.PORT;
 
 (async () => {
   try {
-    const state = await mongodb(uri);
+    const state = await mongodb();
     if (state === 1) {
       console.log("Database connection success!");
       app.listen(port, () => {

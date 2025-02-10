@@ -11,6 +11,7 @@ import cors from "cors";
 import path from "path";
 import env from "./utils/env";
 import routers from "./routers";
+import { redis } from "./database";
 
 const app = express();
 
@@ -45,6 +46,20 @@ if (env.isDev) {
 } else {
   app.use(morgan("tiny"));
 }
+
+/** Middleware for try to reconnect with redis if disconnected */
+app.use(async (_req: Request, _res: Response, next: NextFunction) => {
+  if (!redis || redis.status !== "ready") {
+    console.warn("Redis is disconnected! Attempting to reconnect...");
+    try {
+      await redis?.connect();
+      console.log("Redis reconnected successfully!");
+    } catch (error: any) {
+      console.error("Redis reconnection failed!", error.message);
+    }
+  }
+  next();
+});
 
 /** Api router middleware */
 app.use("/api", routers);
