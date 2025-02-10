@@ -10,7 +10,7 @@ import morgan from "morgan";
 import cors from "cors";
 import path from "path";
 import env from "./utils/env";
-import ApiRouters from "./routers";
+import routers from "./routers";
 
 const app = express();
 
@@ -47,15 +47,36 @@ if (env.isDev) {
 }
 
 /** Api router middleware */
-app.use("/api", ApiRouters);
+app.use("/api", routers);
 
-app.all("*path", (_req: Request, res: Response) => {
-  res.status(200).json({ message: "Hello, from Express via Vercel!" });
+app.get("*path", (_req: Request, res: Response) => {
+  res.status(200).json({ message: "Welcome to the Synchronous Backend!" });
 });
+
+import { ApiError, ApiResponse } from "./utils";
 
 app.use(((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error(`Error: ${err.message}`);
-  res.status(500).json({ message: "Internal Server Error!" });
+
+  let error = new ApiError(500, "Internal Server Error!");
+
+  /* Mongoose Bad ObjectId */
+  if (err.name === "CastError") {
+    error = new ApiError(404, "Resource Not Found!");
+  }
+
+  /* Mongoose Duplicate Key */
+  if (err.code === 11000) {
+    error = new ApiError(400, "Duplicate Field Value Entered!");
+  }
+
+  /* Mongoose Validation Error */
+  if (err.name === "ValidationError" && err.errors) {
+    const message = Object.values(err.errors).map((val: any) => val.message);
+    error = new ApiError(400, message.join(", "));
+  }
+
+  return ApiResponse(res, error.code, error.message);
 }) as ErrorRequestHandler);
 
 export default app;
