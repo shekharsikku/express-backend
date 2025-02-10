@@ -15,6 +15,8 @@ const env = cleanEnv(process.env, {
   PORT: port(),
 
   MONGODB_URI: url(),
+  REDIS_URI: url(),
+
   CORS_ORIGIN: url(),
   NODE_ENV: str({ choices: ["development", "production"] }),
 });
