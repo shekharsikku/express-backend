@@ -12,9 +12,10 @@ import {
 const router = Router();
 
 router.post("/request-send", authAccess, sendRequest);
-router.patch("/request-handle", authAccess, handleRequest);
 
-router.delete("/request-retrieve", authAccess, retrieveRequest);
+router.patch("/request-handle", authAccess, handleRequest);
+router.patch("/request-retrieve", authAccess, retrieveRequest);
+
 router.delete("/unfriend", authAccess, unfriendUser);
 
 router.get("/request-pending", authAccess, pendingRequests);

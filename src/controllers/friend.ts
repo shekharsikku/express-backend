@@ -105,29 +105,21 @@ const handleRequest = async (req: Request, res: Response) => {
   }
 };
 
-
-/*
 const retrieveRequest = async (req: Request, res: Response) => {
   try {
     const requester = req.user?._id;
     const recipient = req.query.from as string;
 
-    const response = await Requests.updateOne(
-      {
-        requester,
-        recipient,
-        status: "pending",
-      },
-      {
-        status: "retrieved",
-      }
+    const cancelResponse = await Friend.updateOne(
+      { requester, recipient, status: "pending" },
+      { $set: { status: "canceled" } }
     );
 
-    if (response.modifiedCount > 0) {
-      return ApiResponse(res, 200, "Friend request retrieved!");
+    if (cancelResponse.modifiedCount > 0) {
+      return ApiResponse(res, 200, "Friend request cancelled!");
     }
 
-    throw new ApiError(400, "No request found to retrieve!");
+    throw new ApiError(400, "No pending request found to cancel!");
   } catch (error: any) {
     return ApiResponse(res, error.code, error.message);
   }
@@ -230,7 +222,7 @@ const pendingRequests = async (req: Request, res: Response) => {
       },
     ];
 
-    const [result] = await Requests.aggregate(pipeline);
+    const [result] = await Friend.aggregate(pipeline);
 
     return ApiResponse(res, 200, "Pending request fetched!", {
       sent: result?.sent || [],
@@ -250,49 +242,19 @@ const unfriendUser = async (req: Request, res: Response) => {
       throw new ApiError(400, "Friend id is required!");
     }
 
-    const user = await User.findById(uid);
-    const friend = await User.findById(fid);
-
-    if (!user || !friend) {
-      throw new ApiError(404, "User not found!");
-    }
-
-    if (
-      !user.friends.includes(friend._id) ||
-      !friend.friends.includes(user._id)
-    ) {
-      throw new ApiError(400, "You are not friend with this user!");
-    }
-
-    const current = await User.findByIdAndUpdate(user._id, {
-      $pull: { friends: friend._id },
+    const unfriendResult = await Friend.deleteOne({
+      status: "accepted",
+      $or: [
+        { requester: uid, recipient: fid },
+        { requester: fid, recipient: uid },
+      ],
     });
 
-    const other = await User.findByIdAndUpdate(friend._id, {
-      $pull: { friends: user._id },
-    });
-
-    if (current && other) {
-      const result = await Requests.deleteOne({
-        status: "accepted",
-        $or: [
-          { requester: user._id, recipient: friend._id },
-          { requester: friend._id, recipient: user._id },
-        ],
-      });
-
-      let message = "";
-
-      if (result.deletedCount > 0) {
-        message = "Friend removed successfully!";
-      } else {
-        message = "No matching friendship found!";
-      }
-
-      return ApiResponse(res, 200, message);
+    if (unfriendResult.deletedCount > 0) {
+      return ApiResponse(res, 200, "Friend removed successfully!");
     }
 
-    throw new ApiError(400, "Error while removing user from friend!");
+    return ApiResponse(res, 400, "No matching friendship found!");
   } catch (error: any) {
     return ApiResponse(res, error.code, error.message);
   }
@@ -300,29 +262,65 @@ const unfriendUser = async (req: Request, res: Response) => {
 
 const fetchFriends = async (req: Request, res: Response) => {
   try {
-    const uid = req.user?._id!;
+    const userId = new Types.ObjectId(req.user?._id);
 
-    const user = await User.findById(uid)
-      .populate("friends", "name email username image bio gender")
-      .lean();
+    const friends = await Friend.aggregate([
+      {
+        $match: {
+          status: "accepted",
+          $or: [{ requester: userId }, { recipient: userId }],
+        },
+      },
+      {
+        $addFields: {
+          friendId: {
+            $cond: {
+              if: { $eq: ["$requester", userId] },
+              then: "$recipient",
+              else: "$requester",
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "friendId",
+          foreignField: "_id",
+          as: "friendData",
+        },
+      },
+      { $unwind: { path: "$friendData", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          friendFrom: "$updatedAt",
+          friendId: "$friendData._id",
+          name: "$friendData.name",
+          email: "$friendData.email",
+          username: "$friendData.username",
+          image: "$friendData.image",
+          bio: "$friendData.bio",
+          gender: "$friendData.gender",
+        },
+      },
+    ]);
 
-    if (!user) {
-      throw new ApiError(404, "User not found");
+    if (!friends.length) {
+      throw new ApiError(404, "No any friends found!");
     }
 
-    const friends = user?.friends || [];
-
-    return ApiResponse(res, 200, "Friend list fetched!", friends);
+    return ApiResponse(res, 200, "Friends fetched successfully!", friends);
   } catch (error: any) {
-    return ApiResponse(res, error.code, error.message);
+    return ApiResponse(res, error.code || 500, error.message);
   }
 };
-*/
+
 export {
   sendRequest,
   handleRequest,
-  // retrieveRequest,
-  // pendingRequests,
-  // unfriendUser,
-  // fetchFriends,
+  retrieveRequest,
+  pendingRequests,
+  unfriendUser,
+  fetchFriends,
 };
