@@ -1,26 +1,13 @@
-import { genSalt, hash, compare } from "bcryptjs";
 import { UserInterface } from "../interface";
 import { Response } from "express";
 import { Types } from "mongoose";
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import env from "../utils/env";
 
-const generateHash = async (plain: string): Promise<string> => {
-  const salt = await genSalt(12);
-  const hashed = await hash(plain, salt);
-  return hashed;
-};
-
-const compareHash = async (plain: string, hashed: string): Promise<boolean> => {
-  const checked = await compare(plain, hashed);
-  return checked;
-};
-
-const generateAccess = (res: Response, user?: UserInterface) => {
+const generateAccess = (res: Response, uid: Types.ObjectId) => {
   const accessExpiry = env.ACCESS_EXPIRY;
 
-  const accessToken = jwt.sign({ user }, env.ACCESS_SECRET, {
+  const accessToken = jwt.sign({ uid }, env.ACCESS_SECRET, {
     algorithm: "HS256",
     expiresIn: accessExpiry,
   });
@@ -70,6 +57,27 @@ const hasEmptyField = (fields: object) => {
   );
 };
 
+const createUserInfo = (user: UserInterface) => {
+  let userInfo;
+
+  if (user.setup) {
+    userInfo = {
+      ...user.toObject(),
+      password: undefined,
+      authentication: undefined,
+    };
+  } else {
+    userInfo = {
+      _id: user._id,
+      email: user.email,
+      setup: user.setup,
+    };
+  }
+
+  return userInfo as UserInterface;
+};
+
+/*
 const removeSpaces = (str: string) => {
   return str.replace(/\s+/g, "");
 };
@@ -85,48 +93,6 @@ const capitalizeWords = (str: string) => {
     .join(" ");
 };
 
-const maskedObjectId = (objectId: Types.ObjectId) => {
-  const idStr = objectId.toString();
-  const maskedId = idStr.slice(0, 4) + "****" + idStr.slice(-4);
-  return maskedId;
-};
-
-const maskedEmail = (email: string) => {
-  const [localPart, domain] = email.split("@");
-  const maskedLocalPart = localPart.slice(0, 4) + "***";
-  return `${maskedLocalPart}@${domain}`;
-};
-
-const maskedDetails = (details: UserInterface) => {
-  const maskId = maskedObjectId(details._id!);
-  const maskEmail = maskedEmail(details.email);
-  return {
-    _id: maskId,
-    email: maskEmail,
-    setup: details.setup!,
-  };
-};
-
-const createAccessData = (user: UserInterface) => {
-  const accessData = {
-    ...user.toObject(),
-    password: undefined,
-    authentication: undefined,
-  };
-  return accessData as UserInterface;
-};
-
-const publicIpAddress = async () => {
-  try {
-    const response = await fetch(env.IPIFY_ADDRESS_URL);
-    const result = await response.json();
-    return result;
-  } catch (error: any) {
-    console.log(`Error: ${error.message}`);
-    return null;
-  }
-};
-
 const generateSecureCode = (length = 6) => {
   const digits = "0123456789";
   const code = Array.from(crypto.randomBytes(length))
@@ -134,17 +100,12 @@ const generateSecureCode = (length = 6) => {
     .join("");
   return code;
 };
+*/
 
 export {
-  generateHash,
-  compareHash,
   generateAccess,
   generateRefresh,
   authorizeCookie,
   hasEmptyField,
-  removeSpaces,
-  maskedDetails,
-  createAccessData,
-  publicIpAddress,
-  generateSecureCode,
+  createUserInfo,
 };
