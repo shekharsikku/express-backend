@@ -6,6 +6,7 @@ import {
   signInUser,
   signOutUser,
   refreshAuth,
+  deleteTokens,
 } from "../controllers/auth";
 
 const router = Router();
@@ -14,5 +15,6 @@ router.post("/sign-up", validateSchema(signUpSchema), signUpUser);
 router.post("/sign-in", validateSchema(signInSchema), signInUser);
 router.delete("/sign-out", authAccess, signOutUser);
 router.get("/auth-refresh", authRefresh, refreshAuth);
+router.delete("/delete-tokens", authAccess, deleteTokens);
 
 export default router;

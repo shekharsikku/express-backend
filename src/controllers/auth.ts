@@ -116,4 +116,27 @@ const refreshAuth = async (req: Request, res: Response) => {
   return ApiResponse(res, 200, "Authentication refreshed!", req.user);
 };
 
-export { signUpUser, signInUser, signOutUser, refreshAuth };
+const deleteTokens = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    const currentDate = new Date();
+
+    const deleteResult = await User.updateOne(
+      { _id: userId },
+      {
+        $pull: {
+          authentication: { expiry: { $lt: currentDate } },
+        },
+      }
+    );
+
+    return ApiResponse(res, 200, "Expired tokens deleted!", {
+      date: currentDate,
+      result: deleteResult,
+    });
+  } catch (error: any) {
+    return ApiResponse(res, error.code, error.message);
+  }
+};
+
+export { signUpUser, signInUser, signOutUser, refreshAuth, deleteTokens };
