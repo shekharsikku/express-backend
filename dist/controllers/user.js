@@ -1,108 +1,89 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchUsers = exports.userInformation = exports.changePassword = exports.profileSetup = void 0;
+exports.fetchContacts = exports.searchUsers = exports.userInformation = exports.changePassword = exports.profileSetup = void 0;
+const mongoose_1 = require("mongoose");
+const bcryptjs_1 = require("bcryptjs");
 const utils_1 = require("../utils");
+const redis_1 = require("../utils/redis");
 const helpers_1 = require("../helpers");
+const conversation_1 = __importDefault(require("../models/conversation"));
 const user_1 = __importDefault(require("../models/user"));
-const profileSetup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const profileSetup = async (req, res) => {
     try {
-        const details = yield req.body;
-        const username = (0, helpers_1.removeSpaces)(details === null || details === void 0 ? void 0 : details.username);
+        const { name, username, gender, bio } = await req.body;
         const requestUser = req.user;
-        if (username !== (requestUser === null || requestUser === void 0 ? void 0 : requestUser.username)) {
-            const existsUsername = yield user_1.default.findOne({ username });
+        if (username !== requestUser?.username) {
+            const existsUsername = await user_1.default.exists({ username });
             if (existsUsername) {
                 throw new utils_1.ApiError(409, "Username already exists!");
             }
         }
-        const updateDetails = {
-            name: details.name,
-            username,
-            gender: details.gender,
-            bio: details.bio,
-        };
-        const isEmpty = (0, helpers_1.hasEmptyField)({
-            name: details.name,
-            username,
-            gender: details.gender,
-        });
-        if (!isEmpty) {
-            updateDetails.setup = true;
+        const userDetails = { name, username, gender, bio, setup: false };
+        const isCompleted = !(0, helpers_1.hasEmptyField)({ name, username, gender });
+        if (isCompleted) {
+            userDetails.setup = true;
         }
-        const updatedProfile = yield user_1.default.findByIdAndUpdate(requestUser === null || requestUser === void 0 ? void 0 : requestUser._id, Object.assign({}, updateDetails), { new: true }).select("-friends");
+        const updatedProfile = await user_1.default.findByIdAndUpdate(requestUser?._id, userDetails, { new: true });
         if (!updatedProfile) {
             throw new utils_1.ApiError(400, "Profile setup not completed!");
         }
-        else if (!updatedProfile.setup) {
-            const userData = (0, helpers_1.maskedDetails)(updatedProfile);
-            return (0, utils_1.ApiResponse)(res, 200, "Please, complete your profile!", userData);
+        const userInfo = (0, helpers_1.createUserInfo)(updatedProfile);
+        if (!userInfo.setup) {
+            return (0, utils_1.ApiResponse)(res, 200, "Please, complete your profile!", userInfo);
         }
-        const accessData = (0, helpers_1.createAccessData)(updatedProfile);
-        const accessToken = (0, helpers_1.generateAccess)(res, accessData);
-        return (0, utils_1.ApiResponse)(res, 200, "Profile updated successfully!", accessData);
+        (0, helpers_1.generateAccess)(res, userInfo._id);
+        await (0, redis_1.setData)(userInfo);
+        return (0, utils_1.ApiResponse)(res, 200, "Profile updated successfully!", userInfo);
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.profileSetup = profileSetup;
-const changePassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const changePassword = async (req, res) => {
     try {
-        const { old_password, new_password } = yield req.body;
-        const [requestUser, hashedPassword] = yield Promise.all([
-            user_1.default.findById((_a = req.user) === null || _a === void 0 ? void 0 : _a._id).select("+password -friends"),
-            (0, helpers_1.generateHash)(new_password),
-        ]);
-        if (!requestUser) {
-            throw new utils_1.ApiError(403, "Invalid authorization!");
-        }
+        const { old_password, new_password } = await req.body;
         if (old_password === new_password) {
             throw new utils_1.ApiError(400, "Please, choose a different password!");
         }
-        const validatePassword = yield (0, helpers_1.compareHash)(old_password, requestUser.password);
-        if (!validatePassword) {
+        const requestUser = await user_1.default.findById(req.user?._id).select("+password");
+        if (!requestUser) {
+            throw new utils_1.ApiError(403, "Invalid authorization!");
+        }
+        const isCorrect = await (0, bcryptjs_1.compare)(old_password, requestUser.password);
+        if (!isCorrect) {
             throw new utils_1.ApiError(403, "Incorrect old password!");
         }
-        requestUser.password = hashedPassword;
-        yield requestUser.save({ validateBeforeSave: true });
-        const accessData = (0, helpers_1.createAccessData)(requestUser);
-        const accessToken = (0, helpers_1.generateAccess)(res, accessData);
-        return (0, utils_1.ApiResponse)(res, 200, "Password changed successfully!", accessData);
+        const hashSalt = await (0, bcryptjs_1.genSalt)(12);
+        requestUser.password = await (0, bcryptjs_1.hash)(new_password, hashSalt);
+        await requestUser.save({ validateBeforeSave: true });
+        const userInfo = (0, helpers_1.createUserInfo)(requestUser);
+        (0, helpers_1.generateAccess)(res, userInfo._id);
+        await (0, redis_1.setData)(userInfo);
+        return (0, utils_1.ApiResponse)(res, 200, "Password changed successfully!", userInfo);
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.changePassword = changePassword;
-const userInformation = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const userInformation = async (req, res) => {
     try {
         const requestUser = req.user;
-        if (requestUser === null || requestUser === void 0 ? void 0 : requestUser.setup) {
-            return (0, utils_1.ApiResponse)(res, 200, "User profile information!", requestUser);
-        }
-        const userData = (0, helpers_1.maskedDetails)(requestUser);
-        return (0, utils_1.ApiResponse)(res, 200, "Please, complete your profile!", userData);
+        const responseMessage = requestUser?.setup
+            ? "User profile information!"
+            : "Please, complete your profile!";
+        return (0, utils_1.ApiResponse)(res, 200, responseMessage, requestUser);
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.userInformation = userInformation;
-const searchUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const searchUsers = async (req, res) => {
     try {
         const search = req.query.search;
         if (!search) {
@@ -110,15 +91,13 @@ const searchUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         const terms = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const regex = new RegExp(terms, "i");
-        const result = yield user_1.default.find({
+        const result = await user_1.default.find({
             $and: [
-                { _id: { $ne: (_a = req.user) === null || _a === void 0 ? void 0 : _a._id } },
+                { _id: { $ne: req.user?._id } },
                 { setup: true },
                 { $or: [{ name: regex }, { username: regex }, { email: regex }] },
             ],
-        })
-            .select("-friends")
-            .lean();
+        }).lean();
         if (result.length == 0) {
             throw new utils_1.ApiError(404, "No any user found!");
         }
@@ -127,5 +106,29 @@ const searchUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.searchUsers = searchUsers;
+const fetchContacts = async (req, res) => {
+    try {
+        const uid = new mongoose_1.Types.ObjectId(req.user?._id);
+        const conversations = await conversation_1.default.find({
+            participants: uid,
+        })
+            .sort({ interaction: -1 })
+            .populate("participants", "name email username gender image bio")
+            .lean();
+        const contacts = conversations
+            .map((conversation) => {
+            const contact = conversation.participants.find((participant) => !participant._id.equals(uid));
+            return contact
+                ? { ...contact, interaction: conversation.interaction }
+                : null;
+        })
+            .filter(Boolean);
+        return (0, utils_1.ApiResponse)(res, 200, "Contacts fetched successfully!", contacts);
+    }
+    catch (error) {
+        return (0, utils_1.ApiResponse)(res, 500, "An error occurred while fetching contacts!");
+    }
+};
+exports.fetchContacts = fetchContacts;

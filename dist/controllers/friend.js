@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -15,130 +6,98 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchFriends = exports.unfriendUser = exports.pendingRequests = exports.retrieveRequest = exports.handleRequest = exports.sendRequest = void 0;
 const utils_1 = require("../utils");
 const mongoose_1 = require("mongoose");
-const request_1 = __importDefault(require("../models/request"));
+const friend_1 = __importDefault(require("../models/friend"));
 const user_1 = __importDefault(require("../models/user"));
-const sendRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const sendRequest = async (req, res) => {
     try {
-        const requester = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const requester = req.user?._id;
         const recipient = req.query.to;
         if (!recipient) {
             throw new utils_1.ApiError(400, "Recipient required for send request!");
         }
-        if ((requester === null || requester === void 0 ? void 0 : requester.toString()) === recipient) {
+        if (requester?.toString() === recipient) {
             throw new utils_1.ApiError(400, "You cannot send a request to yourself!");
         }
-        const exists = yield user_1.default.findById(recipient);
-        if (!exists) {
+        const recipientExists = await user_1.default.exists({ _id: recipient });
+        if (!recipientExists) {
             throw new utils_1.ApiError(404, "Recipient does not exist!");
         }
-        if (exists.friends.includes(requester)) {
-            throw new utils_1.ApiError(400, "You both are already friends!");
-        }
-        const existing = yield request_1.default.findOne({
+        const existingRequest = await friend_1.default.findOne({
             $or: [
                 { requester: requester, recipient: recipient },
                 { requester: recipient, recipient: requester },
             ],
-            status: { $in: ["pending", "accepted", "rejected", "retrieved"] },
+            status: {
+                $in: ["pending", "accepted", "rejected", "canceled", "blocked"],
+            },
         });
-        if (existing) {
-            let message = "";
-            switch (existing.status) {
-                case "pending":
-                    message = "Friend request already sent!";
-                    break;
-                case "accepted":
-                    message = "You both are already friends!";
-                    break;
-                case "rejected":
-                    message = "You are unable to send request!";
-                    break;
-                case "retrieved":
-                    message = "You can send request after few days!";
-                    break;
-                default:
-                    message = "Unable to send request currently!";
+        if (existingRequest) {
+            const cooldownTime = 7 * 24 * 60 * 60 * 1000;
+            const createdAtTime = Date.now() - new Date(existingRequest.createdAt).getTime();
+            if (existingRequest.status === "pending") {
+                throw new utils_1.ApiError(400, "Friend request already sent!");
             }
-            throw new utils_1.ApiError(400, message);
+            if (existingRequest.status === "accepted") {
+                throw new utils_1.ApiError(400, "You both are already friends!");
+            }
+            if (["rejected", "canceled"].includes(existingRequest.status)) {
+                if (createdAtTime < cooldownTime) {
+                    const remainingDays = Math.ceil((cooldownTime - createdAtTime) / (1000 * 60 * 60 * 24));
+                    throw new utils_1.ApiError(400, `You can send a new request after ${remainingDays} days!`);
+                }
+            }
+            if (existingRequest.status === "blocked") {
+                throw new utils_1.ApiError(400, "You cannot send a request. User has blocked you!");
+            }
         }
-        yield request_1.default.create({ requester, recipient });
+        await friend_1.default.create({ requester, recipient });
         return (0, utils_1.ApiResponse)(res, 200, "Friend request sent successfully!");
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.sendRequest = sendRequest;
-const handleRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const handleRequest = async (req, res) => {
     try {
-        const recipient = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const recipient = req.user?._id;
         const requester = req.query.from;
         const action = req.query.action;
         if (!requester) {
-            throw new utils_1.ApiError(400, "Requester required for reject request!");
+            throw new utils_1.ApiError(400, "Requester required for handle request!");
         }
         if (!["accept", "reject"].includes(action)) {
             throw new utils_1.ApiError(400, "Action must be either 'accept' or 'reject'!");
         }
-        const request = yield request_1.default.findOne({
-            requester,
-            recipient,
-            status: "pending",
-        });
-        if (!request) {
-            throw new utils_1.ApiError(404, "Friend request not found!");
+        const updatedResult = await friend_1.default.updateOne({ requester, recipient, status: "pending" }, { $set: { status: action === "accept" ? "accepted" : "rejected" } });
+        if (updatedResult.matchedCount === 0) {
+            throw new utils_1.ApiError(404, "Friend request not found or already processed!");
         }
-        if (action === "accept") {
-            request.status = "accepted";
-            yield request.save();
-            yield user_1.default.findByIdAndUpdate(recipient, {
-                $addToSet: { friends: requester },
-            });
-            yield user_1.default.findByIdAndUpdate(requester, {
-                $addToSet: { friends: recipient },
-            });
-            return (0, utils_1.ApiResponse)(res, 200, "Friend request accepted!");
-        }
-        else if (action === "reject") {
-            request.status = "rejected";
-            yield request.save();
-            return (0, utils_1.ApiResponse)(res, 200, "Friend request rejected!");
-        }
-        throw new utils_1.ApiError(400, "Error occurred while handling request!");
+        return (0, utils_1.ApiResponse)(res, 200, `Friend request ${action}ed successfully!`);
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.handleRequest = handleRequest;
-const retrieveRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const retrieveRequest = async (req, res) => {
     try {
-        const requester = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const requester = req.user?._id;
         const recipient = req.query.from;
-        const response = yield request_1.default.updateOne({
-            requester,
-            recipient,
-            status: "pending",
-        }, {
-            status: "retrieved",
-        });
-        if (response.modifiedCount > 0) {
-            return (0, utils_1.ApiResponse)(res, 200, "Friend request retrieved!");
+        const cancelResponse = await friend_1.default.updateOne({ requester, recipient, status: "pending" }, { $set: { status: "canceled" } });
+        if (cancelResponse.modifiedCount > 0) {
+            return (0, utils_1.ApiResponse)(res, 200, "Friend request cancelled!");
         }
-        throw new utils_1.ApiError(400, "No request found to retrieve!");
+        throw new utils_1.ApiError(400, "No pending request found to cancel!");
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.retrieveRequest = retrieveRequest;
-const pendingRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const pendingRequests = async (req, res) => {
     try {
-        const uid = new mongoose_1.Types.ObjectId((_a = req.user) === null || _a === void 0 ? void 0 : _a._id);
+        const uid = new mongoose_1.Types.ObjectId(req.user?._id);
         const pipeline = [
             {
                 $match: {
@@ -231,79 +190,92 @@ const pendingRequests = (req, res) => __awaiter(void 0, void 0, void 0, function
                 },
             },
         ];
-        const [result] = yield request_1.default.aggregate(pipeline);
+        const [result] = await friend_1.default.aggregate(pipeline);
         return (0, utils_1.ApiResponse)(res, 200, "Pending request fetched!", {
-            sent: (result === null || result === void 0 ? void 0 : result.sent) || [],
-            received: (result === null || result === void 0 ? void 0 : result.received) || [],
+            sent: result?.sent || [],
+            received: result?.received || [],
         });
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.pendingRequests = pendingRequests;
-const unfriendUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const unfriendUser = async (req, res) => {
     try {
-        const uid = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const uid = req.user?._id;
         const fid = req.query.friend;
         if (!fid) {
             throw new utils_1.ApiError(400, "Friend id is required!");
         }
-        const user = yield user_1.default.findById(uid);
-        const friend = yield user_1.default.findById(fid);
-        if (!user || !friend) {
-            throw new utils_1.ApiError(404, "User not found!");
-        }
-        if (!user.friends.includes(friend._id) ||
-            !friend.friends.includes(user._id)) {
-            throw new utils_1.ApiError(400, "You are not friend with this user!");
-        }
-        const current = yield user_1.default.findByIdAndUpdate(user._id, {
-            $pull: { friends: friend._id },
+        const unfriendResult = await friend_1.default.deleteOne({
+            status: "accepted",
+            $or: [
+                { requester: uid, recipient: fid },
+                { requester: fid, recipient: uid },
+            ],
         });
-        const other = yield user_1.default.findByIdAndUpdate(friend._id, {
-            $pull: { friends: user._id },
-        });
-        if (current && other) {
-            const result = yield request_1.default.deleteOne({
-                status: "accepted",
-                $or: [
-                    { requester: user._id, recipient: friend._id },
-                    { requester: friend._id, recipient: user._id },
-                ],
-            });
-            let message = "";
-            if (result.deletedCount > 0) {
-                message = "Friend removed successfully!";
-            }
-            else {
-                message = "No matching friendship found!";
-            }
-            return (0, utils_1.ApiResponse)(res, 200, message);
+        if (unfriendResult.deletedCount > 0) {
+            return (0, utils_1.ApiResponse)(res, 200, "Friend removed successfully!");
         }
-        throw new utils_1.ApiError(400, "Error while removing user from friend!");
+        return (0, utils_1.ApiResponse)(res, 400, "No matching friendship found!");
     }
     catch (error) {
         return (0, utils_1.ApiResponse)(res, error.code, error.message);
     }
-});
+};
 exports.unfriendUser = unfriendUser;
-const fetchFriends = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const fetchFriends = async (req, res) => {
     try {
-        const uid = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
-        const user = yield user_1.default.findById(uid)
-            .populate("friends", "name email username image bio gender")
-            .lean();
-        if (!user) {
-            throw new utils_1.ApiError(404, "User not found");
+        const userId = new mongoose_1.Types.ObjectId(req.user?._id);
+        const friends = await friend_1.default.aggregate([
+            {
+                $match: {
+                    status: "accepted",
+                    $or: [{ requester: userId }, { recipient: userId }],
+                },
+            },
+            {
+                $addFields: {
+                    friendId: {
+                        $cond: {
+                            if: { $eq: ["$requester", userId] },
+                            then: "$recipient",
+                            else: "$requester",
+                        },
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "friendId",
+                    foreignField: "_id",
+                    as: "friendData",
+                },
+            },
+            { $unwind: { path: "$friendData", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 0,
+                    friendFrom: "$updatedAt",
+                    friendId: "$friendData._id",
+                    name: "$friendData.name",
+                    email: "$friendData.email",
+                    username: "$friendData.username",
+                    image: "$friendData.image",
+                    bio: "$friendData.bio",
+                    gender: "$friendData.gender",
+                },
+            },
+        ]);
+        if (!friends.length) {
+            throw new utils_1.ApiError(404, "No any friends found!");
         }
-        const friends = (user === null || user === void 0 ? void 0 : user.friends) || [];
-        return (0, utils_1.ApiResponse)(res, 200, "Friend list fetched!", friends);
+        return (0, utils_1.ApiResponse)(res, 200, "Friends fetched successfully!", friends);
     }
     catch (error) {
-        return (0, utils_1.ApiResponse)(res, error.code, error.message);
+        return (0, utils_1.ApiResponse)(res, error.code || 500, error.message);
     }
-});
+};
 exports.fetchFriends = fetchFriends;

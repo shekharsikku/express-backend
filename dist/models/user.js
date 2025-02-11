@@ -40,16 +40,11 @@ const UserSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
     },
-    friends: [{ type: mongoose_1.Schema.Types.ObjectId, ref: "User" }],
     authentication: {
         type: [
             {
                 token: String,
                 expiry: Date,
-                device: {
-                    type: String,
-                    default: null,
-                },
             },
         ],
         select: false,

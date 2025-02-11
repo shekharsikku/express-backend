@@ -11,6 +11,7 @@ const cors_1 = __importDefault(require("cors"));
 const path_1 = __importDefault(require("path"));
 const env_1 = __importDefault(require("./utils/env"));
 const routers_1 = __importDefault(require("./routers"));
+const database_1 = require("./database");
 const app = (0, express_1.default)();
 app.use(express_1.default.json({
     limit: env_1.default.PAYLOAD_LIMIT,
@@ -33,12 +34,37 @@ if (env_1.default.isDev) {
 else {
     app.use((0, morgan_1.default)("tiny"));
 }
-app.use("/api", routers_1.default);
-app.all("*path", (_req, res) => {
-    res.status(200).json({ message: "Hello, from Express via Vercel!" });
+app.use(async (_req, _res, next) => {
+    if (!database_1.redis || database_1.redis.status !== "ready") {
+        console.warn("Redis is disconnected! Attempting to reconnect...");
+        try {
+            await database_1.redis?.connect();
+            console.log("Redis reconnected successfully!");
+        }
+        catch (error) {
+            console.error("Redis reconnection failed!", error.message);
+        }
+    }
+    next();
 });
+app.use("/api", routers_1.default);
+app.get("*path", (_req, res) => {
+    res.status(200).json({ message: "Welcome to the Synchronous Backend!" });
+});
+const utils_1 = require("./utils");
 app.use(((err, _req, res, _next) => {
     console.error(`Error: ${err.message}`);
-    res.status(500).json({ message: "Internal Server Error!" });
+    let error = new utils_1.ApiError(500, "Internal Server Error!");
+    if (err.name === "CastError") {
+        error = new utils_1.ApiError(404, "Resource Not Found!");
+    }
+    if (err.code === 11000) {
+        error = new utils_1.ApiError(400, "Duplicate Field Value Entered!");
+    }
+    if (err.name === "ValidationError" && err.errors) {
+        const message = Object.values(err.errors).map((val) => val.message);
+        error = new utils_1.ApiError(400, message.join(", "));
+    }
+    return (0, utils_1.ApiResponse)(res, error.code, error.message);
 }));
 exports.default = app;
