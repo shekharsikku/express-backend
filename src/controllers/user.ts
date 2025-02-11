@@ -1,8 +1,10 @@
+import { Types } from "mongoose";
 import { Request, Response } from "express";
 import { genSalt, hash, compare } from "bcryptjs";
 import { ApiError, ApiResponse } from "../utils";
 import { setData } from "../utils/redis";
 import { hasEmptyField, createUserInfo, generateAccess } from "../helpers";
+import Conversation from "../models/conversation";
 import User from "../models/user";
 
 const profileSetup = async (req: Request, res: Response) => {
@@ -127,4 +129,39 @@ const searchUsers = async (req: Request, res: Response) => {
   }
 };
 
-export { profileSetup, changePassword, userInformation, searchUsers };
+const fetchContacts = async (req: Request, res: Response) => {
+  try {
+    const uid = new Types.ObjectId(req.user?._id);
+
+    const conversations = await Conversation.find({
+      participants: uid,
+    })
+      .sort({ interaction: -1 })
+      .populate("participants", "name email username gender image bio")
+      .lean();
+
+    const contacts = conversations
+      .map((conversation) => {
+        const contact = conversation.participants.find(
+          (participant: any) => !participant._id.equals(uid)
+        );
+
+        return contact
+          ? { ...contact, interaction: conversation.interaction }
+          : null;
+      })
+      .filter(Boolean);
+
+    return ApiResponse(res, 200, "Contacts fetched successfully!", contacts);
+  } catch (error: any) {
+    return ApiResponse(res, 500, "An error occurred while fetching contacts!");
+  }
+};
+
+export {
+  profileSetup,
+  changePassword,
+  userInformation,
+  searchUsers,
+  fetchContacts,
+};

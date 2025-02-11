@@ -19,6 +19,6 @@ router.patch("/request-retrieve", authAccess, retrieveRequest);
 router.delete("/unfriend", authAccess, unfriendUser);
 
 router.get("/request-pending", authAccess, pendingRequests);
-router.get("/fetch", authAccess, fetchFriends);
+router.get("/fetch-list", authAccess, fetchFriends);
 
 export default router;

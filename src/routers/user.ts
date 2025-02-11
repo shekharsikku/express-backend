@@ -6,6 +6,7 @@ import {
   changePassword,
   userInformation,
   searchUsers,
+  fetchContacts,
 } from "../controllers/user";
 
 const router = Router();
@@ -26,5 +27,6 @@ router.patch(
 
 router.get("/user-information", authAccess, userInformation);
 router.get("/search-users", authAccess, searchUsers);
+router.get("/fetch-contacts", authAccess, fetchContacts);
 
 export default router;
