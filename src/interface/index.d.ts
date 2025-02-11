@@ -30,3 +30,23 @@ interface FriendInterface extends Document {
   createdAt?: Date;
   updatedAt?: Date;
 }
+
+interface ConversationInterface extends Document {
+  _id?: Types.ObjectId;
+  participants: Types.ObjectId[];
+  messages: Types.ObjectId[];
+  interaction: Date;
+}
+
+interface MessageInterface extends Document {
+  _id?: Types.ObjectId;
+  sender: Types.ObjectId;
+  recipient: Types.ObjectId;
+  type: "default" | "edited" | "deleted";
+  content: {
+    type: "text" | "file";
+    text?: string;
+    file?: string;
+  };
+  deletedAt: Date;
+}
