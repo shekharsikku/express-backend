@@ -49,7 +49,12 @@ app.use(async (_req, _res, next) => {
 });
 app.use("/api", routers_1.default);
 app.get("*path", (_req, res) => {
-    res.status(200).json({ message: "Welcome to the Synchronous Backend!" });
+    if (env_1.default.isDev) {
+        res.status(200).json({ message: "Welcome to Express Backend!" });
+    }
+    else {
+        res.status(301).redirect(env_1.default.REDIRECT_URL);
+    }
 });
 const utils_1 = require("./utils");
 app.use(((err, _req, res, _next) => {

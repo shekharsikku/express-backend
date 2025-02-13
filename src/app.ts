@@ -65,7 +65,11 @@ app.use(async (_req: Request, _res: Response, next: NextFunction) => {
 app.use("/api", routers);
 
 app.get("*path", (_req: Request, res: Response) => {
-  res.status(200).json({ message: "Welcome to the Synchronous Backend!" });
+  if (env.isDev) {
+    res.status(200).json({ message: "Welcome to Express Backend!" });
+  } else {
+    res.status(301).redirect(env.REDIRECT_URL);
+  }
 });
 
 import { ApiError, ApiResponse } from "./utils";

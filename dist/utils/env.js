@@ -16,6 +16,7 @@ const env = (0, envalid_1.cleanEnv)(process.env, {
     PORT: (0, envalid_1.port)(),
     MONGODB_URI: (0, envalid_1.url)(),
     REDIS_URI: (0, envalid_1.url)(),
+    REDIRECT_URL: (0, envalid_1.url)(),
     CORS_ORIGIN: (0, envalid_1.url)(),
     NODE_ENV: (0, envalid_1.str)({ choices: ["development", "production"] }),
 });
