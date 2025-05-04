@@ -76,9 +76,9 @@ const signInUser = async (req: Request, res: Response) => {
     });
 
     const authorizeUser = await existsUser.save();
-    const authorizeId = authorizeUser.authentication?.filter(
+    const authorizeId = authorizeUser.authentication?.find(
       (auth) => auth.token === refreshToken
-    )[0]._id!;
+    )?._id!;
 
     authorizeCookie(res, authorizeId.toString());
 
@@ -116,7 +116,7 @@ const refreshAuth = async (req: Request, res: Response) => {
   return ApiResponse(res, 200, "Authentication refreshed!", req.user);
 };
 
-const deleteTokens = async (req: Request, res: Response) => {
+const deleteTokens = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?._id;
     const currentDate = new Date();

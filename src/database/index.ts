@@ -12,9 +12,9 @@ const mongodb = async (): Promise<ConnectionStates | null> => {
   }
 };
 
-declare global {
-  var redis: Redis | undefined;
-}
+declare const globalThis: {
+  redis: Redis | undefined;
+} & typeof global;
 
 const createRedisClient = () => {
   const redis = new Redis(env.REDIS_URI, {

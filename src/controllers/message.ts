@@ -46,31 +46,37 @@ const sendMessage = async (req: Request, res: Response) => {
   }
 };
 
-const cleanupConversation = async (conversationId: Types.ObjectId) => {
-  const conversations = await Conversation.findById(conversationId).lean();
-
-  if (conversations && conversations.messages.length > 0) {
-    const validMessages = await Message.find({
-      _id: { $in: conversations.messages },
-    }).distinct("_id");
-
-    if (validMessages.length !== conversations.messages.length) {
-      await Conversation.updateOne(
-        { _id: conversationId },
-        { $set: { messages: validMessages } }
-      );
-    }
-  }
-};
-
 const getMessages = async (req: Request, res: Response) => {
   try {
     const sender = req.user?._id;
     const receiver = req.params.id;
 
-    const conversation = await Conversation.findOne({
-      participants: { $all: [sender, receiver] },
-    })
+    const messages = await Message.find({
+      $or: [
+        { sender: sender, recipient: receiver },
+        { sender: receiver, recipient: sender },
+      ],
+    }).distinct("_id");
+
+    const conversation = await Conversation.findOneAndUpdate(
+      {
+        participants: { $all: [sender, receiver] },
+      },
+      [
+        {
+          $set: {
+            messages: {
+              $filter: {
+                input: "$messages",
+                as: "message",
+                cond: { $in: ["$$message", messages] },
+              },
+            },
+          },
+        },
+      ],
+      { new: true }
+    )
       .populate("messages")
       .lean();
 
@@ -78,10 +84,12 @@ const getMessages = async (req: Request, res: Response) => {
       return ApiResponse(res, 200, "No any message available!", []);
     }
 
-    await cleanupConversation(conversation._id);
-    const messages = conversation.messages;
-
-    return ApiResponse(res, 200, "Messages fetched successfully!", messages);
+    return ApiResponse(
+      res,
+      200,
+      "Messages fetched successfully!",
+      conversation?.messages
+    );
   } catch (error: any) {
     return ApiResponse(res, 500, "Error while fetching messages!");
   }
